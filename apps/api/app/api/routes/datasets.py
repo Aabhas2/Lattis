@@ -35,11 +35,13 @@ def upload_dataset(db: Session = Depends(get_db), dataset: UploadFile = File(...
         db_dataset = update_dataset_profile(db, db_dataset.id, profiled_dataset)
 
     except Exception as e: 
+        db.rollback()
         try:
             db_dataset.current_status = UploadStatus.ERROR
             db.commit()
-        except Exception as e: 
+        except Exception:
             db.rollback()  
+            
         raise HTTPException(status_code=500, detail=f"Profiling data failed: {str(e)}")
         
     return {

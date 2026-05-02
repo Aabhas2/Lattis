@@ -52,7 +52,7 @@ def profile_dataset(file_path: str) -> dict:
     row_count = len(df) 
     column_count = len(df.columns) 
 
-    df = df.where(pd.notnull(df), None) 
+    df = df.astype(object).where(pd.notnull(df), None)
 
     columns = [] 
     for col in df.columns: 
@@ -64,34 +64,33 @@ def profile_dataset(file_path: str) -> dict:
         # Stats 
         col_type = detect_column_type(series) 
 
+        stats = None  
+
         if col_type == "Numerical": 
+            val = series.mean() 
+            mean = float(val) if pd.notna(val) else None 
+            min = float(series.min()) if pd.notna(series.min()) else None
+            max = float(series.max()) if pd.notna(series.max()) else None 
+            median = float(series.median()) if pd.notna(series.median()) else None 
+            std = float(series.std()) if pd.notna(series.std()) else None 
             stats = {
-                "mean": float(series.mean()) if not series.empty else None, 
-                "min": float(series.min()) if not series.empty else None, 
-                "max": float(series.max()) if not series.empty else None, 
-                "median": float(series.median()) if not series.empty else None,  
-                "std": float(series.std()) if not series.empty else None, 
+                "mean": mean, 
+                "min": min, 
+                "max": max, 
+                "median": median, 
+                "std": std, 
             }
-
-        elif col_type == "Categorical": 
-            value_counts = series.value_counts().head(5)
-
-            top_values = [
-                {"value": str(idx), "count": int(val)}
-                for idx, val in value_counts.items()
-            ]
+        elif col_type in {"Categorical", "Text", "Datetime"}:
+            value_counts = series.dropna().astype(str).value_counts().head(5) 
+            top_values = [{"value": str(idx), "count": int(val)} for idx, val in value_counts.items()]
             stats = {
-                "top_values": top_values,
-                "unique_count": series.nunique() 
-
+                "top_values": top_values, 
+                "unique_count": int(series.nunique(dropna=True)), 
             }
         elif col_type == "Boolean": 
             stats = {
-                "top_values": [
-                    {"value": str(k), "count": int(v)}
-                    for k,v in series.value_counts().items()
-                ],
-                "unique_count": int(series.nunique())
+                "top_values": [{"value": str(k), "count": int(v)} for k, v in series.value_counts().items()],
+                "unique_count": int(series.nunique()), 
             }
 
         # Column object 
