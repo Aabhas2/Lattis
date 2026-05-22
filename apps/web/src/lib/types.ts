@@ -1,15 +1,19 @@
 export interface NumericStats {
-    type: "numeric"; 
-    mean: number; 
-    min: number; 
-    max: number; 
-    median: number; 
-    std: number; 
+    mean: number | null; 
+    min: number | null; 
+    max: number | null; 
+    median: number | null; 
+    std: number | null; 
+}
+
+export interface TopValue {
+    value: string; 
+    count: number; 
 }
 
 export interface CategoricalValue {
-    value: string | number | boolean; 
-    count: number; 
+    top_values: TopValue[], 
+    unique_count: number, 
 }
 
 export interface CategoricalStats {
@@ -24,10 +28,12 @@ export interface DatasetUploadResponse {
     status: string; 
 }
 
+export type DetectedType = "Numerical" | "Categorical" | "Datetime" | "Text" | "Boolean";
+
 export interface ColumnProfile {
     name: string; 
     dtype: string; 
-    detected_type: "numeric" | "categorical" | "datetime" | "boolean"; 
+    detected_type: DetectedType;
     missing_count: number; 
     missing_percentage: number; 
     unique_count: number; 

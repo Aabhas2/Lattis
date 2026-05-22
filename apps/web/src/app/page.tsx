@@ -5,6 +5,7 @@ import UploadZone from "../components/dataset/UploadZone";
 import { DatasetProfile } from "../lib/types";
 import DatasetSummary from "../components/dataset/DatasetSummary";
 import PreviewTable from "../components/dataset/PreviewTable";
+import ColumnTable from "../components/dataset/ColumnTable";
 
 export default function Page() {
     const [profile, setProfile] = useState<DatasetProfile | null>(null); 
@@ -30,6 +31,7 @@ export default function Page() {
                         columnCount={profile.column_count}
                     />
                     <PreviewTable previewRows={profile.preview_rows} /> 
+                    <ColumnTable columns={profile.columns} />
                 </>
             )}
         </main>
