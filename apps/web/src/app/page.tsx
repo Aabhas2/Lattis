@@ -156,6 +156,7 @@ export default function Page() {
                         </section>
                         <ColumnDetailModal 
                             column={selectedColumn}
+                            previewRows={profile.preview_rows}
                             open={!!selectedColumn}
                             onClose={() => setSelectedColumn(null)}
                         />
