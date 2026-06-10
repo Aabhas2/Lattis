@@ -31,7 +31,7 @@ class PipelineService:
             raise ValueError("drop_columns expects 'columns' to be a list") 
         
         existing_columns = [column for column in columns if column in df.columns]  
-        return df.drop(columns=existing_columns, inplace=True)
+        return df.drop(columns=existing_columns)
         
 
     def fill_missing(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
@@ -73,6 +73,8 @@ class PipelineService:
         
         df_copy = df.copy() 
         df_copy[column] = df_copy[column].fillna(fill_value) 
+
+        return df_copy
 
     def remove_duplicates(self, df: pd.DataFrame) -> pd.DataFrame: 
         return df.drop_duplicates().copy() 
