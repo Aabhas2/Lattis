@@ -1,52 +1,52 @@
-"use client"; 
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-    createPipeline, 
-    getDatasetProfile, 
+    createPipeline,
+    getDatasetProfile,
     addPipelineOperation,
-    previewPipeline, 
-    runPipeline, 
-} from "@/src/lib/api"; 
+    previewPipeline,
+    runPipeline,
+} from "@/src/lib/api";
 import type {
-    DatasetProfile, 
-    PipelineOperation, 
-    PipelinePreviewResponse, 
-    PipelineResponse, 
-} from "@/src/lib/types"; 
-import PipelineHeader from "@/src/components/pipeline/PipelineHeader"; 
+    DatasetProfile,
+    PipelineOperation,
+    PipelinePreviewResponse,
+    PipelineResponse,
+} from "@/src/lib/types";
+import PipelineHeader from "@/src/components/pipeline/PipelineHeader";
 import OperationPanel from "@/src/components/pipeline/OperationPanel";
 import PipelinePreview from "@/src/components/pipeline/PipelinePreview";
 
 export default function PipelinePage() {
-    const searchParams = useSearchParams(); 
-    const datasetId = searchParams.get("dataset_id"); 
+    const searchParams = useSearchParams();
+    const datasetId = searchParams.get("dataset_id");
 
-    const [profile, setProfile] = useState<DatasetProfile | null>(null); 
-    const [pipeline, setPipeline] = useState<PipelineResponse | null>(null); 
-    const [preview, setPreview] = useState<PipelinePreviewResponse | null>(null); 
-    const [loading, setLoading] = useState(true); 
-    const [previewLoading, setPreviewLoading] = useState(false); 
-    const [isSubmittingOp, setIsSubmittingOp] = useState(false); 
-    const [isRunning, setIsRunning] = useState(false); 
-    const [previewError, setPreviewError] = useState<string | null>(null); 
-    const [pageError, setPageError] = useState<string | null>(null); 
-    const [runMessage, setRunMessage] = useState<string | null>(null); 
+    const [profile, setProfile] = useState<DatasetProfile | null>(null);
+    const [pipeline, setPipeline] = useState<PipelineResponse | null>(null);
+    const [preview, setPreview] = useState<PipelinePreviewResponse | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const [isSubmittingOp, setIsSubmittingOp] = useState(false);
+    const [isRunning, setIsRunning] = useState(false);
+    const [previewError, setPreviewError] = useState<string | null>(null);
+    const [pageError, setPageError] = useState<string | null>(null);
+    const [runMessage, setRunMessage] = useState<string | null>(null);
 
     const refreshPreview = useCallback(async (pipelineId: string) => {
-        setPreviewLoading(true); 
-        setPreviewError(null); 
+        setPreviewLoading(true);
+        setPreviewError(null);
         try {
-            const result = await previewPipeline(pipelineId,100); 
-            setPreview(result); 
+            const result = await previewPipeline(pipelineId, 100);
+            setPreview(result);
         } catch (err) {
-            setPreviewError(err instanceof Error ? err.message : "Preview failed."); 
+            setPreviewError(err instanceof Error ? err.message : "Preview failed.");
         } finally {
-            setPreviewLoading(false); 
+            setPreviewLoading(false);
         }
-    }, []); 
+    }, []);
 
     useEffect(() => {
         async function init() {
@@ -55,7 +55,7 @@ export default function PipelinePage() {
                 setPageError("Missing dataset_id in URL. Open this page from the dataset profile.");
                 return;
             }
-            
+
             try {
                 const datasetProfile = await getDatasetProfile(datasetId);
                 const created = await createPipeline(datasetId, "Cleaning pipeline");
@@ -68,7 +68,7 @@ export default function PipelinePage() {
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
                 };
-    
+
                 setProfile(datasetProfile);
                 setPipeline(pipelineData);
             } catch (err) {
@@ -77,59 +77,59 @@ export default function PipelinePage() {
                 setLoading(false);
             }
         }
-    
+
         init();
     }, [datasetId]);
 
     useEffect(() => {
-        if (!pipeline) return; 
+        if (!pipeline) return;
 
         const timer = setTimeout(() => {
             if (pipeline.operations.length > 0) {
-                refreshPreview(pipeline.pipeline_id); 
+                refreshPreview(pipeline.pipeline_id);
             } else {
-                setPreview(null); 
-                setPreviewError(null); 
+                setPreview(null);
+                setPreviewError(null);
             }
-        }, 400); 
+        }, 400);
 
-        return () => clearTimeout(timer); 
+        return () => clearTimeout(timer);
     }, [pipeline, refreshPreview]);
 
     async function handleAddOperation(operation: PipelineOperation) {
-        if (!pipeline) return; 
+        if (!pipeline) return;
 
-        setIsSubmittingOp(true); 
+        setIsSubmittingOp(true);
         try {
-            const updated = await addPipelineOperation(pipeline.pipeline_id, operation); 
-            setPipeline(updated); 
+            const updated = await addPipelineOperation(pipeline.pipeline_id, operation);
+            setPipeline(updated);
         } finally {
-            setIsSubmittingOp(false); 
+            setIsSubmittingOp(false);
         }
     }
 
     async function handleRun() {
-        if (!pipeline) return; 
+        if (!pipeline) return;
 
-        setIsRunning(true); 
-        setRunMessage(null); 
+        setIsRunning(true);
+        setRunMessage(null);
 
         try {
-            const result = await runPipeline(pipeline.pipeline_id); 
-            setRunMessage(`Pipeline run started/completed: ${JSON.stringify(result)}`); 
+            const result = await runPipeline(pipeline.pipeline_id);
+            setRunMessage(`Pipeline run started/completed: ${JSON.stringify(result)}`);
         } catch (err) {
-            setRunMessage(err instanceof Error ? err.message : "Run failed."); 
+            setRunMessage(err instanceof Error ? err.message : "Run failed.");
         } finally {
-            setIsRunning(false); 
+            setIsRunning(false);
         }
     }
 
     if (loading) {
         return (
             <main className="min-h-screen bg-zinc-950 text-zinc-100">
-                <div className="mx-auto max-w-6xl px-6 py-10">Loading pipeline builder...</div> 
+                <div className="mx-auto max-w-6xl px-6 py-10">Loading pipeline builder...</div>
             </main>
-        ); 
+        );
     }
 
     if (pageError || !profile || !pipeline) {
@@ -138,26 +138,26 @@ export default function PipelinePage() {
                 <div className="mx-auto max-w-6xl px-6 py-10">
                     <p className="text-rose-400">{pageError ?? "Failed to load pipeline page."}</p>
                     <Link href="/" className="mt-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
-                    Back to upload</Link>
+                        Back to upload</Link>
                 </div>
             </main>
         );
     }
 
     return (
-        <main className="min-h-scren bg-zinc-950 text-zinc-100">
+        <main className="min-h-screen bg-zinc-950 text-zinc-100">
             <div className="mx-auto max-w-6xl px-6 py-10 space-y-10">
-                <Link href="/" className="text-sm text-zinc-400 hover:text-zinc-200">
+                <Link href={`/?dataset_id=${datasetId}`} className="text-sm text-zinc-400 hover:text-zinc-200">
                     ← Back to dataset profile
                 </Link>
 
                 <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                    <PipelineHeader 
-                        pipelineName={pipeline.name ?? "Pipeline"} 
-                        datasetId={pipeline.dataset_id} 
-                        operationCount={pipeline.operations.length} 
+                    <PipelineHeader
+                        pipelineName={pipeline.name ?? "Pipeline"}
+                        datasetId={pipeline.dataset_id}
+                        operationCount={pipeline.operations.length}
                         status={pipeline.status}
-                        isRunning={isRunning} 
+                        isRunning={isRunning}
                         onRun={handleRun}
                     />
                     {runMessage && <p className="mt-4 text-sm text-zinc-400">{runMessage}</p>}
@@ -165,13 +165,13 @@ export default function PipelinePage() {
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                     <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                        <h3 className="text-lg font-semibold">Add Operation</h3> 
+                        <h3 className="text-lg font-semibold">Add Operation</h3>
                         <p className="mt-1 text-sm text-zinc-400">
-                            Build your cleaning pipeline step by step. 
+                            Build your cleaning pipeline step by step.
                         </p>
 
                         <div className="mt-6">
-                            <OperationPanel 
+                            <OperationPanel
                                 columns={profile.columns}
                                 onAddOperation={handleAddOperation}
                                 isSubmitting={isSubmittingOp}
@@ -184,7 +184,7 @@ export default function PipelinePage() {
                                 <ul className="mt-2 space-y-2">
                                     {pipeline.operations.map((op, index) => (
                                         <li
-                                            key={`${op.type}-${index}`} 
+                                            key={`${op.type}-${index}`}
                                             className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm font-mono"
                                         >
                                             {op.type} {JSON.stringify(op.params)}
@@ -196,16 +196,16 @@ export default function PipelinePage() {
                     </section>
 
                     <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                        <h3 className="text-lg font-semibold">Preview</h3> 
+                        <h3 className="text-lg font-semibold">Preview</h3>
                         <p className="mt-1 text-sm text-zinc-400">
-                            Live preview after each operation (debounced). 
+                            Live preview after each operation (debounced).
                         </p>
                         <div className="mt-6">
-                            <PipelinePreview 
-                                rows={preview?.rows ?? null} 
-                                columns={preview?.columns ?? null} 
-                                previewRows={preview?.preview ?? []} 
-                                isLoading={previewLoading} 
+                            <PipelinePreview
+                                rows={preview?.rows ?? null}
+                                columns={preview?.columns ?? null}
+                                previewRows={preview?.preview ?? []}
+                                isLoading={previewLoading}
                                 error={previewError}
                             />
                         </div>

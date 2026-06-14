@@ -45,10 +45,12 @@ def get_pipeline(db: Session, pipeline_id) -> Pipeline:
 
 def append_pipeline_operation(db: Session, pipeline_id, operation: dict): 
     pipeline = get_pipeline(db, pipeline_id) 
-    if not pipeline: raise ValueError("Pipeline not found") 
-    ops = pipeline.operations or [] 
+    if not pipeline: raise ValueError("Pipeline not found")
+
+    ops = list(pipeline.operations or []) 
     ops.append(operation) 
     pipeline.operations = ops 
+
     db.commit() 
     db.refresh(pipeline) 
     return pipeline 

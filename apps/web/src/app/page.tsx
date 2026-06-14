@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { getDatasetProfile } from "../lib/api";
 import UploadZone from "../components/dataset/UploadZone";
 import { ColumnProfile, DatasetProfile } from "../lib/types";
@@ -9,49 +9,75 @@ import ColumnTable from "../components/dataset/ColumnTable";
 import ColumnInsightCard from "../components/dataset/ColumnInsightCard";
 import ColumnDetailModal from "../components/dataset/ColumnDetailModal";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
-export default function Page() {
+function ProfilePageContent() {
     type PageView = "upload" | "loading" | "profile";
     const [view, setView] = useState<PageView>("upload")
-    const [profile, setProfile] = useState<DatasetProfile | null>(null); 
-    const [isFetchingProfile, setIsFetchingProfile] = useState(false); 
-    const [selectedColumn, setSelectedColumn] = useState<ColumnProfile | null>(null);  
-    const [columnSearch, setColumnSearch] = useState(""); 
+    const [profile, setProfile] = useState<DatasetProfile | null>(null);
+    const [isFetchingProfile, setIsFetchingProfile] = useState(false);
+    const [selectedColumn, setSelectedColumn] = useState<ColumnProfile | null>(null);
+    const [columnSearch, setColumnSearch] = useState("");
+
+    const searchParams = useSearchParams();
+    const datasetIdParam = searchParams.get("dataset_id");
 
     const filteredColumns =
         profile?.columns.filter((column) =>
             column.name.toLowerCase().includes(columnSearch.toLowerCase())
-    ) ?? [];
+        ) ?? [];
 
     useEffect(() => {
         if (
-            selectedColumn && 
-            !filteredColumns.some((column) => column.name === selectedColumn.name) 
+            selectedColumn &&
+            !filteredColumns.some((column) => column.name === selectedColumn.name)
         ) {
-            setSelectedColumn(null); 
+            setSelectedColumn(null);
         }
     }, [columnSearch, filteredColumns, selectedColumn])
 
+    // Load dataset profile from URL parameter if present
+    useEffect(() => {
+        if (datasetIdParam) {
+            const datasetId = datasetIdParam;
 
+            async function fetchProfile() {
+                setIsFetchingProfile(true);
+                setView("loading");
+                try {
+                    const data = await getDatasetProfile(datasetId);
+                    setProfile(data);
+                    setSelectedColumn(null);
+                    setView("profile");
+                } catch (error) {
+                    console.error("Failed to fetch profile:", error)
+                    setView("upload")
+                } finally {
+                    setIsFetchingProfile(false);
+                }
+            }
+            fetchProfile();
+        }
+    }, [datasetIdParam]);
 
     async function handleUploadSuccess(datasetId: string) {
-        if (!datasetId) return; 
+        if (!datasetId) return;
         setIsFetchingProfile(true);
         setView("loading");
         try {
-            const profile = await getDatasetProfile(datasetId); 
+            const profile = await getDatasetProfile(datasetId);
             console.log(profile.columns[0]);
-            setProfile(profile); 
-            setSelectedColumn(null); 
+            setProfile(profile);
+            setSelectedColumn(null);
             setView("profile");
         } catch (error) {
-            console.error("Failed to fetch the profile:", error); 
+            console.error("Failed to fetch the profile:", error);
             setView("upload");
         } finally {
             setIsFetchingProfile(false);
         }
-        
     }
+
     return (
         <main className="min-h-screen bg-zinc-950 text-zinc-100">
             <div className="mx-auto max-w-6xl px-6 py-10 space-y-10">
@@ -60,7 +86,7 @@ export default function Page() {
                     <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
                         <h2 className="text-2xl font-semibold">Upload Dataset</h2>
                         <p className="mt-1 text-sm text-zinc-400">
-                            Upload a CSV or XLSX file to profile and explore your dataset. 
+                            Upload a CSV or XLSX file to profile and explore your dataset.
                         </p>
                         <div className="mt-6">
                             <UploadZone onUploadSuccess={handleUploadSuccess} />
@@ -83,10 +109,10 @@ export default function Page() {
                         <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
                             <h2 className="text-2xl font-semibold">Dataset Overview</h2>
                             <p className="mt-1 text-sm text-zinc-400">
-                                Quick summary of rows, columns, and dataset metadata. 
+                                Quick summary of rows, columns, and dataset metadata.
                             </p>
                             <div className="mt-6">
-                                <DatasetSummary 
+                                <DatasetSummary
                                     datasetId={profile.dataset_id}
                                     rowCount={profile.row_count}
                                     columnCount={profile.column_count}
@@ -106,10 +132,10 @@ export default function Page() {
                         <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
                             <h2 className="text-2xl font-semibold">Column Profiling</h2>
                             <p className="mt-1 text-sm text-zinc-400">
-                                Column types, missing values, uniqueness, and key stats. 
+                                Column types, missing values, uniqueness, and key stats.
                             </p>
                             <div className="mt-6">
-                                <ColumnTable columns={filteredColumns} /> 
+                                <ColumnTable columns={filteredColumns} />
                             </div>
                         </section>
 
@@ -117,53 +143,52 @@ export default function Page() {
                         <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
                             <h2 className="text-2xl font-semibold">Column Insights</h2>
                             <p className="mt-1 text-sm text-zinc-400">
-                                Detailed stats and top values for each feature. 
+                                Detailed stats and top values for each feature.
                             </p>
 
                             <div className="mt-6">
-                                <input 
+                                <input
                                     type="text"
-                                    value={columnSearch} 
-                                    onChange={(e) => setColumnSearch(e.target.value)} 
-                                    placeholder="Search columns..." 
+                                    value={columnSearch}
+                                    onChange={(e) => setColumnSearch(e.target.value)}
+                                    placeholder="Search columns..."
                                     className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:border-zinc-500"
                                 />
 
                                 <p className="mt-2 text-sm text-zinc-400">
-                                    Showing {filteredColumns.length} of {profile.columns.length} columns 
+                                    Showing {filteredColumns.length} of {profile.columns.length} columns
                                 </p>
 
                                 {filteredColumns.length === 0 && columnSearch.trim() !== "" && (
                                     <p className="mt-4 text-sm text-zinc-400">
-                                        No columns match your search. 
+                                        No columns match your search.
                                     </p>
                                 )}
                             </div>
 
                             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                                 {filteredColumns.map((col) => (
-                                    <ColumnInsightCard 
-                                    key={col.name} 
-                                    column={col} 
-                                    selected={selectedColumn?.name === col.name} 
-                                    onClick={() => setSelectedColumn(col)}
-                                    /> 
+                                    <ColumnInsightCard
+                                        key={col.name}
+                                        column={col}
+                                        selected={selectedColumn?.name === col.name}
+                                        onClick={() => setSelectedColumn(col)}
+                                    />
                                 ))}
                             </div>
                         </section>
 
-                        {/* Dataset Preview */} 
+                        {/* Dataset Preview */}
                         <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                            
                             <h2 className="text-2xl font-semibold">Dataset Preview</h2>
                             <p className="mt-1 text-sm text-zinc-400">
-                                Raw rows preview for quick inspection. 
+                                Raw rows preview for quick inspection.
                             </p>
                             <div className="mt-6">
-                                <PreviewTable previewRows={profile.preview_rows} /> 
+                                <PreviewTable previewRows={profile.preview_rows} />
                             </div>
                         </section>
-                        <ColumnDetailModal 
+                        <ColumnDetailModal
                             column={selectedColumn}
                             previewRows={profile.preview_rows}
                             open={!!selectedColumn}
@@ -173,5 +198,14 @@ export default function Page() {
                 )}
             </div>
         </main>
-    )
+    );
+}
+
+// Wrap inside Suspense to avoid build-time optimization warnings for useSearchParams
+export default function Page() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-zinc-950 text-zinc-100 p-10">Loading page...</div>}>
+            <ProfilePageContent />
+        </Suspense>
+    );
 }
