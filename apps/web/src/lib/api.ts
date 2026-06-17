@@ -130,3 +130,53 @@ export async function deletePipelineOperation(
     }
     return response.json();
 }
+
+export async function getHistogram(
+    datasetId: string,
+    column: string,
+    bins: number = 10
+): Promise<any> {
+    const response = await fetch(`${BASE_URL}/datasets/${datasetId}/histogram?column=${column}&bins=${bins}`);
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to fetch histogram data (${response.status}): ${text}`);
+    }
+    return response.json();
+}
+
+export async function getBoxplot(
+    datasetId: string,
+    column: string
+): Promise<any> {
+    const response = await fetch(`${BASE_URL}/datasets/${datasetId}/boxplot?column=${column}`);
+    if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`Failed to fetch boxplot data (${response.status}): ${text}`);
+    }
+    return response.json();
+}
+
+export async function getScatterplot(
+    datasetId: string,
+    colX: string,
+    colY: string,
+    sampleLimit: number = 1000
+): Promise<any> {
+    const response = await fetch(`${BASE_URL}/datasets/${datasetId}/scatterplot?col_x=${colX}&col_y=${colY}&sample_limit=${sampleLimit}`);
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to fetch scatterplot data (${response.status}): ${text}`);
+    }
+    return response.json();
+}
+
+export async function getCorrelationMatrix(
+    datasetId: string
+): Promise<any> {
+    const response = await fetch(`${BASE_URL}/datasets/${datasetId}/correlation-matrix`);
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to fetch correlation matrix (${response.status}): ${text}`);
+    }
+    return response.json();
+}

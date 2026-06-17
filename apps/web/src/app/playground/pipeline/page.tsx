@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -21,7 +21,7 @@ import PipelineHeader from "@/src/components/pipeline/PipelineHeader";
 import OperationPanel from "@/src/components/pipeline/OperationPanel";
 import PipelinePreview from "@/src/components/pipeline/PipelinePreview";
 
-export default function PipelinePage() {
+function PipelinePageContent() {
     const searchParams = useSearchParams();
     const datasetId = searchParams.get("dataset_id");
 
@@ -298,5 +298,13 @@ export default function PipelinePage() {
                 </div>
             </div>
         </main>
+    );
+}
+
+export default function PipelinePage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-zinc-950 text-zinc-100 p-10">Loading pipeline builder...</div>}>
+            <PipelinePageContent />
+        </Suspense>
     );
 }

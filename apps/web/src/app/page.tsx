@@ -1,4 +1,5 @@
-"use client"
+"use client";
+
 import { useEffect, useState, Suspense } from "react";
 import { getDatasetProfile } from "../lib/api";
 import UploadZone from "../components/dataset/UploadZone";
@@ -8,16 +9,18 @@ import PreviewTable from "../components/dataset/PreviewTable";
 import ColumnTable from "../components/dataset/ColumnTable";
 import ColumnInsightCard from "../components/dataset/ColumnInsightCard";
 import ColumnDetailModal from "../components/dataset/ColumnDetailModal";
+import VisualizationTab from "../components/dataset/VisualizationTab";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 function ProfilePageContent() {
     type PageView = "upload" | "loading" | "profile";
-    const [view, setView] = useState<PageView>("upload")
+    const [view, setView] = useState<PageView>("upload");
     const [profile, setProfile] = useState<DatasetProfile | null>(null);
     const [isFetchingProfile, setIsFetchingProfile] = useState(false);
     const [selectedColumn, setSelectedColumn] = useState<ColumnProfile | null>(null);
     const [columnSearch, setColumnSearch] = useState("");
+    const [activeTab, setActiveTab] = useState<"overview" | "visualize">("overview");
 
     const searchParams = useSearchParams();
     const datasetIdParam = searchParams.get("dataset_id");
@@ -34,7 +37,7 @@ function ProfilePageContent() {
         ) {
             setSelectedColumn(null);
         }
-    }, [columnSearch, filteredColumns, selectedColumn])
+    }, [columnSearch, filteredColumns, selectedColumn]);
 
     // Load dataset profile from URL parameter if present
     useEffect(() => {
@@ -50,8 +53,8 @@ function ProfilePageContent() {
                     setSelectedColumn(null);
                     setView("profile");
                 } catch (error) {
-                    console.error("Failed to fetch profile:", error)
-                    setView("upload")
+                    console.error("Failed to fetch profile:", error);
+                    setView("upload");
                 } finally {
                     setIsFetchingProfile(false);
                 }
@@ -65,11 +68,11 @@ function ProfilePageContent() {
         setIsFetchingProfile(true);
         setView("loading");
         try {
-            const profile = await getDatasetProfile(datasetId);
-            console.log(profile.columns[0]);
-            setProfile(profile);
+            const profileData = await getDatasetProfile(datasetId);
+            setProfile(profileData);
             setSelectedColumn(null);
             setView("profile");
+            setActiveTab("overview");
         } catch (error) {
             console.error("Failed to fetch the profile:", error);
             setView("upload");
@@ -105,95 +108,126 @@ function ProfilePageContent() {
 
                 {view === "profile" && profile && (
                     <div className="space-y-10">
-                        {/* Dataset Overview */}
-                        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                            <h2 className="text-2xl font-semibold">Dataset Overview</h2>
-                            <p className="mt-1 text-sm text-zinc-400">
-                                Quick summary of rows, columns, and dataset metadata.
-                            </p>
-                            <div className="mt-6">
-                                <DatasetSummary
-                                    datasetId={profile.dataset_id}
-                                    rowCount={profile.row_count}
-                                    columnCount={profile.column_count}
-                                />
-                            </div>
-                            <div className="mt-4">
-                                <Link
-                                    href={`/playground/pipeline?dataset_id=${profile.dataset_id}`}
-                                    className="inline-flex rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
-                                >
-                                    Build Cleaning Pipeline →
-                                </Link>
-                            </div>
-                        </section>
+                        {/* Tab Switcher */}
+                        <div className="flex border-b border-zinc-800">
+                            <button
+                                onClick={() => setActiveTab("overview")}
+                                className={`px-6 py-3 text-sm font-medium border-b-2 transition ${
+                                    activeTab === "overview"
+                                        ? "border-emerald-500 text-emerald-400"
+                                        : "border-transparent text-zinc-400 hover:text-zinc-200"
+                                }`}
+                            >
+                                Overview & Profiling
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("visualize")}
+                                className={`px-6 py-3 text-sm font-medium border-b-2 transition ${
+                                    activeTab === "visualize"
+                                        ? "border-emerald-500 text-emerald-400"
+                                        : "border-transparent text-zinc-400 hover:text-zinc-200"
+                                }`}
+                            >
+                                Interactive Visualizations
+                            </button>
+                        </div>
 
-                        {/* Column Profiling Table */}
-                        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                            <h2 className="text-2xl font-semibold">Column Profiling</h2>
-                            <p className="mt-1 text-sm text-zinc-400">
-                                Column types, missing values, uniqueness, and key stats.
-                            </p>
-                            <div className="mt-6">
-                                <ColumnTable columns={filteredColumns} />
-                            </div>
-                        </section>
-
-                        {/* Column Insights Cards */}
-                        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                            <h2 className="text-2xl font-semibold">Column Insights</h2>
-                            <p className="mt-1 text-sm text-zinc-400">
-                                Detailed stats and top values for each feature.
-                            </p>
-
-                            <div className="mt-6">
-                                <input
-                                    type="text"
-                                    value={columnSearch}
-                                    onChange={(e) => setColumnSearch(e.target.value)}
-                                    placeholder="Search columns..."
-                                    className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:border-zinc-500"
-                                />
-
-                                <p className="mt-2 text-sm text-zinc-400">
-                                    Showing {filteredColumns.length} of {profile.columns.length} columns
-                                </p>
-
-                                {filteredColumns.length === 0 && columnSearch.trim() !== "" && (
-                                    <p className="mt-4 text-sm text-zinc-400">
-                                        No columns match your search.
+                        {activeTab === "overview" ? (
+                            <>
+                                {/* Dataset Overview */}
+                                <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
+                                    <h2 className="text-2xl font-semibold">Dataset Overview</h2>
+                                    <p className="mt-1 text-sm text-zinc-400">
+                                        Quick summary of rows, columns, and dataset metadata.
                                     </p>
-                                )}
-                            </div>
+                                    <div className="mt-6">
+                                        <DatasetSummary
+                                            datasetId={profile.dataset_id}
+                                            rowCount={profile.row_count}
+                                            columnCount={profile.column_count}
+                                        />
+                                    </div>
+                                    <div className="mt-4">
+                                        <Link
+                                            href={`/playground/pipeline?dataset_id=${profile.dataset_id}`}
+                                            className="inline-flex rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+                                        >
+                                            Build Cleaning Pipeline →
+                                        </Link>
+                                    </div>
+                                </section>
 
-                            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                {filteredColumns.map((col) => (
-                                    <ColumnInsightCard
-                                        key={col.name}
-                                        column={col}
-                                        selected={selectedColumn?.name === col.name}
-                                        onClick={() => setSelectedColumn(col)}
-                                    />
-                                ))}
-                            </div>
-                        </section>
+                                {/* Column Profiling Table */}
+                                <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
+                                    <h2 className="text-2xl font-semibold">Column Profiling</h2>
+                                    <p className="mt-1 text-sm text-zinc-400">
+                                        Column types, missing values, uniqueness, and key stats.
+                                    </p>
+                                    <div className="mt-6">
+                                        <ColumnTable columns={filteredColumns} />
+                                    </div>
+                                </section>
 
-                        {/* Dataset Preview */}
-                        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                            <h2 className="text-2xl font-semibold">Dataset Preview</h2>
-                            <p className="mt-1 text-sm text-zinc-400">
-                                Raw rows preview for quick inspection.
-                            </p>
-                            <div className="mt-6">
-                                <PreviewTable previewRows={profile.preview_rows} />
-                            </div>
-                        </section>
-                        <ColumnDetailModal
-                            column={selectedColumn}
-                            previewRows={profile.preview_rows}
-                            open={!!selectedColumn}
-                            onClose={() => setSelectedColumn(null)}
-                        />
+                                {/* Column Insights Cards */}
+                                <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
+                                    <h2 className="text-2xl font-semibold">Column Insights</h2>
+                                    <p className="mt-1 text-sm text-zinc-400">
+                                        Detailed stats and top values for each feature.
+                                    </p>
+
+                                    <div className="mt-6">
+                                        <input
+                                            type="text"
+                                            value={columnSearch}
+                                            onChange={(e) => setColumnSearch(e.target.value)}
+                                            placeholder="Search columns..."
+                                            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:border-zinc-500"
+                                        />
+
+                                        <p className="mt-2 text-sm text-zinc-400">
+                                            Showing {filteredColumns.length} of {profile.columns.length} columns
+                                        </p>
+
+                                        {filteredColumns.length === 0 && columnSearch.trim() !== "" && (
+                                            <p className="mt-4 text-sm text-zinc-400">
+                                                No columns match your search.
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                        {filteredColumns.map((col) => (
+                                            <ColumnInsightCard
+                                                key={col.name}
+                                                column={col}
+                                                selected={selectedColumn?.name === col.name}
+                                                onClick={() => setSelectedColumn(col)}
+                                            />
+                                        ))}
+                                    </div>
+                                </section>
+
+                                {/* Dataset Preview */}
+                                <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
+                                    <h2 className="text-2xl font-semibold">Dataset Preview</h2>
+                                    <p className="mt-1 text-sm text-zinc-400">
+                                        Raw rows preview for quick inspection.
+                                    </p>
+                                    <div className="mt-6">
+                                        <PreviewTable previewRows={profile.preview_rows} />
+                                    </div>
+                                </section>
+
+                                <ColumnDetailModal
+                                    column={selectedColumn}
+                                    previewRows={profile.preview_rows}
+                                    open={!!selectedColumn}
+                                    onClose={() => setSelectedColumn(null)}
+                                />
+                            </>
+                        ) : (
+                            <VisualizationTab datasetId={profile.dataset_id} columns={profile.columns} />
+                        )}
                     </div>
                 )}
             </div>
