@@ -1,4 +1,5 @@
 import uuid 
+import re
 from typing import List, Optional 
 
 import pandas as pd 
@@ -171,9 +172,31 @@ def run_pipeline(pipeline_id: uuid.UUID, db: Session = Depends(get_db)):
         result_df.to_csv(new_file_path, index=False) 
 
         # Create a new Dataset entry in the database 
-        new_filename = f"transformed_{dataset.filename}" 
-        new_dataset = crud.create_dataset(db, new_filename, str(new_file_path)) 
+        # Clean base name 
+        base_name = Path(dataset.filename).stem 
+        base_name = re.sub(r"_cleaned_v\d+", "", base_name) 
+        base_name = re.sub(r"^transformed_", "", base_name) 
 
+        # Query all existing datasets starting with the base name 
+        existing_databases = db.query(crud.Dataset).filter(crud.Dataset.filename.like(f"{base_name}%")).all() 
+
+        # Find highest version number 
+        max_version = 0 
+        pattern = re.compile(rf"^{re.escape(base_name)}_cleaned_v(\d+)\.csv$", re.IGNORECASE) 
+
+        for d in existing_databases: 
+            match = pattern.search(d.filename) 
+            if match: 
+                val = int(match.group(1)) 
+                if val > max_version: 
+                    max_version = val 
+
+        next_version = max_version + 1 
+        new_filename = f"{base_name}_cleaned_v{next_version}.csv"
+
+        # Create versioned Dataset entry in database 
+        new_dataset = crud.create_dataset(db, new_filename, str(new_file_path)) 
+        
         # Profile the new dataset 
         profiled_data = profile_dataset(str(new_file_path)) 
         crud.update_dataset_profile(db, new_dataset.id, profiled_data)
@@ -186,7 +209,8 @@ def run_pipeline(pipeline_id: uuid.UUID, db: Session = Depends(get_db)):
             "new_dataset_id": new_dataset.id, 
             "rows": len(result_df), 
             "columns": len(result_df.columns), 
-            "message": "Pipeline run successfully and transformed dataset persisted."
+            "message": "Pipeline run successfully and transformed dataset persisted.",
+            "filename": new_filename 
         }
 
     except Exception as e: 
@@ -196,3 +220,21 @@ def run_pipeline(pipeline_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {str(e)}")
     
 
+@router.put("/{pipeline_id}/operations", response_model=pipeline_schemas.PipelineResponse) 
+def update_pipeline_operations(
+    pipeline_id: uuid.UUID, 
+    operations: List[pipeline_schemas.PipelineOperation], 
+    db: Session = Depends(get_db), 
+): 
+    pipeline = crud.get_pipeline(db, pipeline_id)
+    if not pipeline: 
+        raise HTTPException(status_code=404, detail="Pipeline not found") 
+
+    ops_dump = [op.model_dump() for op in operations] 
+
+    try: 
+        pipeline = crud.update_pipeline_operations(db, pipeline_id, ops_dump) 
+    except ValueError as e: 
+        raise HTTPException(status_code=404, detail=str(e)) 
+
+    return _to_pipeline_response(pipeline)

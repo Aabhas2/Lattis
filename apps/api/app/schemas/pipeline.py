@@ -39,4 +39,5 @@ class PipelineRunResponse(BaseModel):
     rows: int 
     columns: int 
     message: str 
+    filename: str
   
