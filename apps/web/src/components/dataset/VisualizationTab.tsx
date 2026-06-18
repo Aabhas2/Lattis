@@ -11,7 +11,6 @@ import {
     ResponsiveContainer,
     ScatterChart,
     Scatter,
-    Cell,
 } from "recharts";
 import { getHistogram, getBoxplot, getScatterplot, getCorrelationMatrix } from "../../lib/api";
 import { ColumnProfile } from "../../lib/types";
@@ -136,36 +135,40 @@ export default function VisualizationTab({ datasetId, columns }: VisualizationTa
 
     if (numericColumns.length === 0) {
         return (
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-10 text-center">
-                <p className="text-zinc-400">No numeric columns found in this dataset.</p>
-                <p className="mt-1 text-xs text-zinc-600">Numerical visualizations require at least one numerical feature.</p>
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-10 text-center space-y-2">
+                <p className="text-zinc-400 font-semibold">No numeric columns found in this dataset.</p>
+                <p className="text-xs text-zinc-600">Numerical visualizations require at least one numerical feature.</p>
             </div>
         );
     }
 
-    // Custom SVG Boxplot implementation
+    const activeColProfile = columns.find((c) => c.name === distCol);
+    const isColumnOnlyNulls = activeColProfile && activeColProfile.missing_count === activeColProfile.unique_count && activeColProfile.unique_count === 0;
+
+    // Custom SVG Boxplot with fixed scales to prevent cropping
     const renderSVGBoxplot = (data: { min: number; q1: number; median: number; q3: number; max: number; outliers: number[] }) => {
         const allVals = [data.min, data.q1, data.median, data.q3, data.max, ...data.outliers];
         const valMin = Math.min(...allVals);
         const valMax = Math.max(...allVals);
         const range = valMax - valMin === 0 ? 1 : valMax - valMin;
 
-        // Add 5% padding to scale
-        const dataMin = valMin - range * 0.05;
-        const dataMax = valMax + range * 0.05;
+        // Pad scale slightly so capping lines fit
+        const dataMin = valMin - range * 0.08;
+        const dataMax = valMax + range * 0.08;
         const finalRange = dataMax - dataMin;
 
-        const width = 320;
-        const height = 360;
-        const padding = 30;
+        // Custom bounds to guarantee it fits vertically and horizontally
+        const width = 200;
+        const height = 360; // Shrunk to fit inside 420px card wrapper
+        const padding = 40;
 
         const yScale = (val: number) => {
             const ratio = (val - dataMin) / finalRange;
             return height - padding - ratio * (height - 2 * padding);
         };
 
-        const x = width / 2;
-        const boxWidth = 60;
+        const x = width / 2 - 10;
+        const boxWidth = 50;
 
         const yMin = yScale(data.min);
         const yQ1 = yScale(data.q1);
@@ -174,77 +177,82 @@ export default function VisualizationTab({ datasetId, columns }: VisualizationTa
         const yMax = yScale(data.max);
 
         return (
-            <div className="flex flex-col items-center sm:flex-row sm:justify-center gap-8">
-                <svg width={width} height={height} className="bg-zinc-950/40 rounded-xl border border-zinc-850">
-                    {/* Grid line guidelines */}
-                    <line x1={0} y1={yMin} x2={width} y2={yMin} stroke="#27272a" strokeWidth={1} strokeDasharray="3 3" />
-                    <line x1={0} y1={yQ1} x2={width} y2={yQ1} stroke="#27272a" strokeWidth={1} strokeDasharray="3 3" />
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 w-full">
+                <svg width={width} height={height} className="bg-zinc-950/20 rounded-xl border border-zinc-900/60 p-2">
+                    {/* Tick Mark Guide Lines */}
+                    <line x1={0} y1={yMin} x2={width} y2={yMin} stroke="#18181b" strokeWidth={1} strokeDasharray="3 3" />
+                    <line x1={0} y1={yQ1} x2={width} y2={yQ1} stroke="#18181b" strokeWidth={1} strokeDasharray="3 3" />
                     <line x1={0} y1={yMed} x2={width} y2={yMed} stroke="#27272a" strokeWidth={1} strokeDasharray="3 3" />
-                    <line x1={0} y1={yQ3} x2={width} y2={yQ3} stroke="#27272a" strokeWidth={1} strokeDasharray="3 3" />
-                    <line x1={0} y1={yMax} x2={width} y2={yMax} stroke="#27272a" strokeWidth={1} strokeDasharray="3 3" />
+                    <line x1={0} y1={yQ3} x2={width} y2={yQ3} stroke="#18181b" strokeWidth={1} strokeDasharray="3 3" />
+                    <line x1={0} y1={yMax} x2={width} y2={yMax} stroke="#18181b" strokeWidth={1} strokeDasharray="3 3" />
 
                     {/* Whiskers (Vertical Lines) */}
                     <line x1={x} y1={yMin} x2={x} y2={yQ1} stroke="#10b981" strokeWidth={2} />
                     <line x1={x} y1={yQ3} x2={x} y2={yMax} stroke="#10b981" strokeWidth={2} />
 
-                    {/* Whisker caps */}
-                    <line x1={x - 15} y1={yMin} x2={x + 15} y2={yMin} stroke="#10b981" strokeWidth={2} />
-                    <line x1={x - 15} y1={yMax} x2={x + 15} y2={yMax} stroke="#10b981" strokeWidth={2} />
+                    {/* Whisker Caps */}
+                    <line x1={x - 12} y1={yMin} x2={x + 12} y2={yMin} stroke="#10b981" strokeWidth={2} />
+                    <line x1={x - 12} y1={yMax} x2={x + 12} y2={yMax} stroke="#10b981" strokeWidth={2} />
 
-                    {/* IQR Box */}
+                    {/* Box */}
                     <rect
                         x={x - boxWidth / 2}
                         y={yQ3}
                         width={boxWidth}
                         height={Math.max(2, yQ1 - yQ3)}
                         fill="#064e3b"
-                        fillOpacity={0.4}
+                        fillOpacity={0.3}
                         stroke="#10b981"
                         strokeWidth={2}
-                        rx={2}
+                        rx={1}
                     />
 
                     {/* Median Line */}
-                    <line x1={x - boxWidth / 2} y1={yMed} x2={x + boxWidth / 2} y2={yMed} stroke="#34d399" strokeWidth={3} />
+                    <line x1={x - boxWidth / 2} y1={yMed} x2={x + boxWidth / 2} y2={yMed} stroke="#34d399" strokeWidth={3.5} />
 
                     {/* Outliers */}
                     {data.outliers.map((val, idx) => (
-                        <circle key={idx} cx={x} cy={yScale(val)} r={4} fill="#f43f5e" stroke="#fda4af" strokeWidth={1} />
+                        <circle key={idx} cx={x} cy={yScale(val)} r={3.5} fill="#f43f5e" stroke="#fda4af" strokeWidth={1} />
                     ))}
 
-                    {/* Label texts inside SVG */}
-                    <text x={x + boxWidth / 2 + 10} y={yMax + 4} fill="#94a3b8" className="text-xs font-mono">Max: {data.max.toFixed(2)}</text>
-                    <text x={x + boxWidth / 2 + 10} y={yQ3 + 4} fill="#94a3b8" className="text-xs font-mono font-semibold">Q3: {data.q1.toFixed(2)}</text>
-                    <text x={x + boxWidth / 2 + 10} y={yMed + 4} fill="#34d399" className="text-xs font-mono font-bold">Med: {data.median.toFixed(2)}</text>
-                    <text x={x + boxWidth / 2 + 10} y={yQ1 + 4} fill="#94a3b8" className="text-xs font-mono font-semibold">Q1: {data.q3.toFixed(2)}</text>
-                    <text x={x + boxWidth / 2 + 10} y={yMin + 4} fill="#94a3b8" className="text-xs font-mono">Min: {data.min.toFixed(2)}</text>
+                    {/* Text values aligned on the right edge */}
+                    <text x={x + boxWidth / 2 + 8} y={yMax + 4} fill="#71717a" className="text-[10px] font-mono">Max: {data.max.toFixed(1)}</text>
+                    <text x={x + boxWidth / 2 + 8} y={yQ3 + 4} fill="#a1a1aa" className="text-[10px] font-mono">Q3: {data.q3.toFixed(1)}</text>
+                    <text x={x + boxWidth / 2 + 8} y={yMed + 4} fill="#34d399" className="text-[10px] font-mono font-bold">Med: {data.median.toFixed(1)}</text>
+                    <text x={x + boxWidth / 2 + 8} y={yQ1 + 4} fill="#a1a1aa" className="text-[10px] font-mono">Q1: {data.q1.toFixed(1)}</text>
+                    <text x={x + boxWidth / 2 + 8} y={yMin + 4} fill="#71717a" className="text-[10px] font-mono">Min: {data.min.toFixed(1)}</text>
                 </svg>
 
-                <div className="space-y-4 max-w-xs text-sm">
-                    <h5 className="text-zinc-200 font-semibold uppercase tracking-wider text-xs">Statistical Summary</h5>
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-2 font-mono">
-                        <span className="text-zinc-400">Maximum:</span>
-                        <span className="text-zinc-200 text-right">{data.max.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
-                        <span className="text-zinc-400">Third Quartile (Q3):</span>
-                        <span className="text-zinc-200 text-right">{data.q3.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
-                        <span className="text-zinc-400">Median (Q2):</span>
-                        <span className="text-emerald-400 font-semibold text-right">{data.median.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
-                        <span className="text-zinc-400">First Quartile (Q1):</span>
-                        <span className="text-zinc-200 text-right">{data.q1.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
-                        <span className="text-zinc-400">Minimum:</span>
-                        <span className="text-zinc-200 text-right">{data.min.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+                <div className="space-y-3 flex-1 text-sm max-w-[200px]">
+                    <h5 className="text-zinc-400 font-semibold uppercase tracking-wider text-[10px]">Stats</h5>
+                    <div className="space-y-1.5 font-mono text-xs">
+                        <div className="flex justify-between border-b border-zinc-900 pb-1">
+                            <span className="text-zinc-500">Max:</span>
+                            <span className="text-zinc-200">{data.max.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-zinc-900 pb-1">
+                            <span className="text-zinc-500">Q3:</span>
+                            <span className="text-zinc-200">{data.q3.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-zinc-900 pb-1 font-semibold">
+                            <span className="text-zinc-400">Median:</span>
+                            <span className="text-emerald-400">{data.median.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-zinc-900 pb-1">
+                            <span className="text-zinc-500">Q1:</span>
+                            <span className="text-zinc-200">{data.q1.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-zinc-500">Min:</span>
+                            <span className="text-zinc-200">{data.min.toFixed(2)}</span>
+                        </div>
                     </div>
 
-                    <div className="pt-3 border-t border-zinc-800">
-                        <span className="block text-zinc-400 mb-1">Outliers detected:</span>
-                        <span className={`text-sm font-semibold font-mono ${data.outliers.length > 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                    <div className="pt-2 border-t border-zinc-800">
+                        <span className="block text-[11px] text-zinc-500">Outliers:</span>
+                        <span className={`text-xs font-mono font-semibold ${data.outliers.length > 0 ? "text-rose-400" : "text-emerald-400"}`}>
                             {data.outliers.length} points
                         </span>
-                        {data.outliers.length > 0 && (
-                            <p className="mt-1 text-xs text-zinc-500">
-                                Outliers are values outside 1.5 × IQR (Interquartile Range).
-                            </p>
-                        )}
                     </div>
                 </div>
             </div>
@@ -253,45 +261,41 @@ export default function VisualizationTab({ datasetId, columns }: VisualizationTa
 
     return (
         <div className="space-y-8">
-            {/* View Selection Tab-bar */}
+            {/* Tab Selection */}
             <div className="flex flex-wrap gap-2 border-b border-zinc-800 pb-4">
                 <button
                     onClick={() => setSubTab("distribution")}
-                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                        subTab === "distribution" ? "bg-emerald-950 text-emerald-400 border border-emerald-800" : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200 border border-transparent"
-                    }`}
+                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${subTab === "distribution" ? "bg-emerald-950 text-emerald-400 border border-emerald-800" : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200 border border-transparent"
+                        }`}
                 >
                     Distribution Analysis
                 </button>
                 <button
                     onClick={() => setSubTab("relationship")}
-                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                        subTab === "relationship" ? "bg-emerald-950 text-emerald-400 border border-emerald-800" : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200 border border-transparent"
-                    }`}
+                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${subTab === "relationship" ? "bg-emerald-950 text-emerald-400 border border-emerald-800" : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200 border border-transparent"
+                        }`}
                 >
                     Scatter Plot (Relationship)
                 </button>
                 <button
                     onClick={() => setSubTab("correlation")}
-                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                        subTab === "correlation" ? "bg-emerald-950 text-emerald-400 border border-emerald-800" : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200 border border-transparent"
-                    }`}
+                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${subTab === "correlation" ? "bg-emerald-950 text-emerald-400 border border-emerald-800" : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200 border border-transparent"
+                        }`}
                 >
                     Correlation Matrix
                 </button>
             </div>
 
-            {/* Subtab: Distribution */}
             {subTab === "distribution" && (
                 <div className="space-y-6">
-                    {/* Controls */}
+                    {/* Controls Selector */}
                     <div className="flex flex-wrap items-center gap-4 bg-zinc-900/20 border border-zinc-800 p-4 rounded-xl">
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-zinc-400 font-semibold uppercase">Column</label>
                             <select
                                 value={distCol}
                                 onChange={(e) => setDistCol(e.target.value)}
-                                className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                                className="rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-500"
                             >
                                 {numericColumns.map((col) => (
                                     <option key={col.name} value={col.name}>
@@ -305,7 +309,7 @@ export default function VisualizationTab({ datasetId, columns }: VisualizationTa
                             <select
                                 value={bins}
                                 onChange={(e) => setBins(Number(e.target.value))}
-                                className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                                className="rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-500"
                             >
                                 <option value={5}>5 Bins</option>
                                 <option value={10}>10 Bins</option>
@@ -316,74 +320,87 @@ export default function VisualizationTab({ datasetId, columns }: VisualizationTa
                         </div>
                     </div>
 
-                    {/* Chart Layout */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Histogram Container */}
-                        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
-                            <div>
-                                <h4 className="text-lg font-semibold text-zinc-200">Histogram</h4>
-                                <p className="text-xs text-zinc-400">Frequency distribution of values</p>
+                    {isColumnOnlyNulls ? (
+                        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-10 text-center">
+                            <p className="text-zinc-400">Column "{distCol}" contains only missing/null values.</p>
+                            <p className="mt-1 text-xs text-zinc-600">Please choose a different column or impute missing values first.</p>
+                        </div>
+                    ) : (
+                        /* Grid Layout split 60-40 split */
+                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                            {/* Histogram (Span 3 - 60%) */}
+                            <div className="lg:col-span-3 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
+                                <div>
+                                    <h4 className="text-lg font-semibold text-zinc-200">Histogram</h4>
+                                    <p className="text-xs text-zinc-400">Frequency distribution of values</p>
+                                </div>
+
+                                {histLoading ? (
+                                    <div className="h-[420px] flex items-center justify-center text-zinc-500">Loading Histogram...</div>
+                                ) : histError ? (
+                                    <div className="h-[420px] flex items-center justify-center text-rose-400 text-sm">Error: {histError}</div>
+                                ) : histData && histData.length > 0 ? (
+                                    <div className="h-[420px] w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={histData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#1f1f23" />
+                                                <XAxis dataKey="bin_label" stroke="#52525b" fontSize={9} angle={-15} textAnchor="end" />
+                                                <YAxis stroke="#52525b" fontSize={10} />
+                                                {/* Adjusted Cursor properties to prevent Solid White BG Overlay */}
+                                                <Tooltip
+                                                    cursor={{ fill: "#27272a", opacity: 0.15 }}
+                                                    contentStyle={{ backgroundColor: "#09090b", borderColor: "#27272a", borderRadius: "8px" }}
+                                                    labelStyle={{ color: "#a1a1aa", fontSize: "11px", fontFamily: "monospace" }}
+                                                    itemStyle={{ color: "#34d399", fontSize: "12px" }}
+                                                />
+                                                <Bar
+                                                    dataKey="count"
+                                                    fill="#10b981"
+                                                    radius={[3, 3, 0, 0]}
+                                                    opacity={0.85}
+                                                    activeBar={{ fill: "#34d399", opacity: 1 }}
+                                                />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                ) : (
+                                    <div className="h-[420px] flex items-center justify-center text-zinc-600">No histogram data.</div>
+                                )}
                             </div>
 
-                            {histLoading ? (
-                                <div className="h-[320px] flex items-center justify-center text-zinc-500">Loading Histogram...</div>
-                            ) : histError ? (
-                                <div className="h-[320px] flex items-center justify-center text-rose-400 text-sm">Error: {histError}</div>
-                            ) : histData && histData.length > 0 ? (
-                                <div className="h-[320px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={histData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#1f1f23" />
-                                            <XAxis dataKey="bin_label" stroke="#71717a" fontSize={10} angle={-15} textAnchor="end" />
-                                            <YAxis stroke="#71717a" fontSize={10} />
-                                            <Tooltip
-                                                contentStyle={{ backgroundColor: "#09090b", borderColor: "#27272a", borderRadius: "8px" }}
-                                                labelStyle={{ color: "#a1a1aa", fontSize: "12px", fontFamily: "monospace" }}
-                                                itemStyle={{ color: "#34d399", fontSize: "13px" }}
-                                            />
-                                            <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} opacity={0.85} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
+                            {/* Boxplot (Span 2 - 40%) */}
+                            <div className="lg:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
+                                <div>
+                                    <h4 className="text-lg font-semibold text-zinc-200">Box & Whisker Plot</h4>
+                                    <p className="text-xs text-zinc-400">Five-number summary and outliers</p>
                                 </div>
-                            ) : (
-                                <div className="h-[320px] flex items-center justify-center text-zinc-600">No histogram data.</div>
-                            )}
-                        </div>
 
-                        {/* Boxplot Container */}
-                        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
-                            <div>
-                                <h4 className="text-lg font-semibold text-zinc-200">Box & Whisker Plot</h4>
-                                <p className="text-xs text-zinc-400">Five-number summary and outliers</p>
+                                {boxLoading ? (
+                                    <div className="h-[420px] flex items-center justify-center text-zinc-500">Loading Boxplot...</div>
+                                ) : boxError ? (
+                                    <div className="h-[420px] flex items-center justify-center text-rose-400 text-sm">Error: {boxError}</div>
+                                ) : boxData ? (
+                                    <div className="h-[420px] flex items-center justify-center py-2">
+                                        {renderSVGBoxplot(boxData)}
+                                    </div>
+                                ) : (
+                                    <div className="h-[420px] flex items-center justify-center text-zinc-600">No boxplot data.</div>
+                                )}
                             </div>
-
-                            {boxLoading ? (
-                                <div className="h-[320px] flex items-center justify-center text-zinc-500">Loading Boxplot...</div>
-                            ) : boxError ? (
-                                <div className="h-[320px] flex items-center justify-center text-rose-400 text-sm">Error: {boxError}</div>
-                            ) : boxData ? (
-                                <div className="h-[320px] flex items-center justify-center py-2">
-                                    {renderSVGBoxplot(boxData)}
-                                </div>
-                            ) : (
-                                <div className="h-[320px] flex items-center justify-center text-zinc-600">No boxplot data.</div>
-                            )}
                         </div>
-                    </div>
+                    )}
                 </div>
             )}
 
-            {/* Subtab: Scatterplot */}
             {subTab === "relationship" && (
                 <div className="space-y-6">
-                    {/* Controls */}
                     <div className="flex flex-wrap items-center gap-4 bg-zinc-900/20 border border-zinc-800 p-4 rounded-xl">
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-zinc-400 font-semibold uppercase">X-Axis Variable</label>
                             <select
                                 value={scatterXCol}
                                 onChange={(e) => setScatterXCol(e.target.value)}
-                                className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                                className="rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-500"
                             >
                                 {numericColumns.map((col) => (
                                     <option key={col.name} value={col.name}>
@@ -397,7 +414,7 @@ export default function VisualizationTab({ datasetId, columns }: VisualizationTa
                             <select
                                 value={scatterYCol}
                                 onChange={(e) => setScatterYCol(e.target.value)}
-                                className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                                className="rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-500"
                             >
                                 {numericColumns.map((col) => (
                                     <option key={col.name} value={col.name}>
@@ -408,10 +425,9 @@ export default function VisualizationTab({ datasetId, columns }: VisualizationTa
                         </div>
                     </div>
 
-                    {/* Chart Card */}
                     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
                         <div>
-                            <h4 className="text-lg font-semibold text-zinc-200">Scatter Plot Matrix Relationship</h4>
+                            <h4 className="text-lg font-semibold text-zinc-200">Scatter Plot Relationship</h4>
                             <p className="text-xs text-zinc-400">Co-dependence between X and Y variables (sampled up to 1000 points)</p>
                         </div>
 
@@ -428,17 +444,17 @@ export default function VisualizationTab({ datasetId, columns }: VisualizationTa
                                             type="number"
                                             dataKey="x"
                                             name={scatterXCol}
-                                            stroke="#71717a"
-                                            fontSize={11}
-                                            label={{ value: scatterXCol, position: "insideBottom", offset: -5, fill: "#a1a1aa" }}
+                                            stroke="#52525b"
+                                            fontSize={10}
+                                            label={{ value: scatterXCol, position: "insideBottom", offset: -5, fill: "#71717a", fontSize: "11px" }}
                                         />
                                         <YAxis
                                             type="number"
                                             dataKey="y"
                                             name={scatterYCol}
-                                            stroke="#71717a"
-                                            fontSize={11}
-                                            label={{ value: scatterYCol, angle: -90, position: "insideLeft", offset: 10, fill: "#a1a1aa" }}
+                                            stroke="#52525b"
+                                            fontSize={10}
+                                            label={{ value: scatterYCol, angle: -90, position: "insideLeft", offset: 10, fill: "#71717a", fontSize: "11px" }}
                                         />
                                         <Tooltip
                                             cursor={{ strokeDasharray: "3 3", stroke: "#27272a" }}
@@ -448,16 +464,16 @@ export default function VisualizationTab({ datasetId, columns }: VisualizationTa
                                             formatter={(value: any, name: any, props: any) => {
                                                 const point = props.payload;
                                                 return [
-                                                    <>
-                                                        <div className="text-zinc-400 font-sans font-semibold mb-1">Data Point</div>
+                                                    <div key={point.x}>
+                                                        <div className="text-zinc-400 font-sans font-semibold mb-1">Point</div>
                                                         <div className="text-zinc-300 font-mono">{scatterXCol}: {point.x.toFixed(4)}</div>
                                                         <div className="text-zinc-300 font-mono">{scatterYCol}: {point.y.toFixed(4)}</div>
-                                                    </>,
+                                                    </div>,
                                                     "",
                                                 ];
                                             }}
                                         />
-                                        <Scatter name="Points" data={scatterData} fill="#10b981" opacity={0.6} />
+                                        <Scatter name="Points" data={scatterData} fill="#10b981" opacity={0.65} />
                                     </ScatterChart>
                                 </ResponsiveContainer>
                             </div>
@@ -468,13 +484,12 @@ export default function VisualizationTab({ datasetId, columns }: VisualizationTa
                 </div>
             )}
 
-            {/* Subtab: Correlation Heatmap */}
             {subTab === "correlation" && (
                 <div className="space-y-6">
                     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
                         <div>
                             <h4 className="text-lg font-semibold text-zinc-200">Pearson Correlation Heatmap</h4>
-                            <p className="text-xs text-zinc-400">Strength of linear relationships (positive correlation is green, negative is rose)</p>
+                            <p className="text-xs text-zinc-400">Strength of linear relationships (positive is green, negative is rose)</p>
                         </div>
 
                         {corrLoading ? (
@@ -504,18 +519,14 @@ export default function VisualizationTab({ datasetId, columns }: VisualizationTa
                                                         </td>
                                                         {corrData.columns.map((col, colIndex) => {
                                                             const val = corrData.matrix[rowIndex][colIndex] ?? 0;
-                                                            // Calculate color gradient based on value from -1 to 1
-                                                            // -1 is deep red, 0 is dark gray, +1 is deep green
                                                             let bgStyle = { backgroundColor: "#18181b", color: "#a1a1aa" };
                                                             if (val > 0) {
-                                                                // Positive correlation: Emerald (opacity goes 0.05 to 0.8)
                                                                 const alpha = 0.05 + val * 0.75;
                                                                 bgStyle = {
                                                                     backgroundColor: `rgba(16, 185, 129, ${alpha})`,
                                                                     color: val > 0.4 ? "#ffffff" : "#a1a1aa",
                                                                 };
                                                             } else if (val < 0) {
-                                                                // Negative correlation: Rose
                                                                 const absVal = Math.abs(val);
                                                                 const alpha = 0.05 + absVal * 0.75;
                                                                 bgStyle = {

@@ -331,23 +331,42 @@ export default function OperationPanel({
             )}
 
             {operationType === "one_hot_encode" && (
-                <div className="space-y-2">
-                    <label className="text-sm text-zinc-400">Select columns to encode:</label>
-                    <div className="max-h-48 space-y-2 overflow-auto rounded-lg border border-zinc-800 p-3">
-                        {columns
-                            .filter((col) => ["Categorical", "Text", "Boolean"].includes(col.detected_type))
-                            .map((col) => (
-                                <label key={col.name} className="flex items-center gap-2 text-sm">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedColumns.includes(col.name)}
-                                        onChange={() => toggleColumn(col.name)}
-                                    />
-                                    {col.name} <span className="text-xs text-zinc-500">({col.detected_type})</span>
-                                </label>
-                            ))
-                        }
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-sm text-zinc-400 font-medium">Select columns to encode:</label>
+                        <div className="max-h-48 space-y-2 overflow-auto rounded-lg border border-zinc-850 bg-zinc-950/20 p-3">
+                            {columns
+                                .filter((col) => ["Categorical", "Text", "Boolean"].includes(col.detected_type))
+                                .map((col) => (
+                                    <label key={col.name} className="flex items-center gap-2 text-sm text-zinc-300 select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedColumns.includes(col.name)}
+                                            onChange={() => toggleColumn(col.name)}
+                                        />
+                                        {col.name} <span className="text-xs text-zinc-500">({col.detected_type})</span>
+                                    </label>
+                                ))
+                            }
+                        </div>
                     </div>
+                    {selectedColumns.length > 0 && (
+                        <div className="rounded-lg border border-r-emerald-800/40 bg-emerald-950/10 p-3 space-y-1.5 animate-fade-in">
+                            <span className="block text-xs font-semibold text-emerald-400 uppercase tracking-wide">Encoding Impact Estimate</span>
+                            <div className="divide-y divide-emerald-950/40 font-mono text-xs">
+                                {selectedColumns.map((colName) => {
+                                    const col = columns.find((c) => c.name === colName);
+                                    if (!col) return null;
+                                    return (
+                                        <div key={colName} className="flex justify-between py-1 text-zinc-300">
+                                            <span>{colName}</span>
+                                            <span>Unique: <strong className="text-emerald-400">{col.unique_count}</strong> → adds <strong className="text-emerald-400">+{col.unique_count}</strong>columns</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

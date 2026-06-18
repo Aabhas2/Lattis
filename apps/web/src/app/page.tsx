@@ -10,6 +10,7 @@ import ColumnTable from "../components/dataset/ColumnTable";
 import ColumnInsightCard from "../components/dataset/ColumnInsightCard";
 import ColumnDetailModal from "../components/dataset/ColumnDetailModal";
 import VisualizationTab from "../components/dataset/VisualizationTab";
+import PipelineTab from "../components/dataset/PipelineTab";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -20,7 +21,7 @@ function ProfilePageContent() {
     const [isFetchingProfile, setIsFetchingProfile] = useState(false);
     const [selectedColumn, setSelectedColumn] = useState<ColumnProfile | null>(null);
     const [columnSearch, setColumnSearch] = useState("");
-    const [activeTab, setActiveTab] = useState<"overview" | "visualize">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "visualize" | "pipeline">("overview");
 
     const searchParams = useSearchParams();
     const datasetIdParam = searchParams.get("dataset_id");
@@ -81,6 +82,15 @@ function ProfilePageContent() {
         }
     }
 
+    // Pre-calculate overview metrics
+    const totalMissing = profile?.columns.reduce((sum, col) => sum + col.missing_count, 0) ?? 0;
+    const numericCount = profile?.columns.filter(
+        (col) =>
+            col.detected_type === "Numerical" ||
+            col.dtype.toLowerCase().includes("int") ||
+            col.dtype.toLowerCase().includes("float")
+    ).length ?? 0;
+
     return (
         <main className="min-h-screen bg-zinc-950 text-zinc-100">
             <div className="mx-auto max-w-6xl px-6 py-10 space-y-10">
@@ -108,52 +118,52 @@ function ProfilePageContent() {
 
                 {view === "profile" && profile && (
                     <div className="space-y-10">
-                        {/* Tab Switcher */}
+                        {/* Unified Top Navigation Journey */}
                         <div className="flex border-b border-zinc-800">
                             <button
                                 onClick={() => setActiveTab("overview")}
-                                className={`px-6 py-3 text-sm font-medium border-b-2 transition ${
-                                    activeTab === "overview"
+                                className={`px-6 py-3 text-sm font-medium border-b-2 transition ${activeTab === "overview"
                                         ? "border-emerald-500 text-emerald-400"
                                         : "border-transparent text-zinc-400 hover:text-zinc-200"
-                                }`}
+                                    }`}
                             >
                                 Overview & Profiling
                             </button>
                             <button
                                 onClick={() => setActiveTab("visualize")}
-                                className={`px-6 py-3 text-sm font-medium border-b-2 transition ${
-                                    activeTab === "visualize"
+                                className={`px-6 py-3 text-sm font-medium border-b-2 transition ${activeTab === "visualize"
                                         ? "border-emerald-500 text-emerald-400"
                                         : "border-transparent text-zinc-400 hover:text-zinc-200"
-                                }`}
+                                    }`}
                             >
                                 Interactive Visualizations
                             </button>
+                            <button
+                                onClick={() => setActiveTab("pipeline")}
+                                className={`px-6 py-3 text-sm font-medium border-b-2 transition ${activeTab === "pipeline"
+                                        ? "border-emerald-500 text-emerald-400"
+                                        : "border-transparent text-zinc-400 hover:text-zinc-200"
+                                    }`}
+                            >
+                                Cleaning Pipeline
+                            </button>
                         </div>
 
-                        {activeTab === "overview" ? (
+                        {/* Overview Tab */}
+                        {activeTab === "overview" && (
                             <>
-                                {/* Dataset Overview */}
                                 <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
                                     <h2 className="text-2xl font-semibold">Dataset Overview</h2>
                                     <p className="mt-1 text-sm text-zinc-400">
-                                        Quick summary of rows, columns, and dataset metadata.
+                                        Quick summary of rows, columns, and dataset stats.
                                     </p>
                                     <div className="mt-6">
                                         <DatasetSummary
-                                            datasetId={profile.dataset_id}
                                             rowCount={profile.row_count}
                                             columnCount={profile.column_count}
+                                            totalMissing={totalMissing}
+                                            numericCount={numericCount}
                                         />
-                                    </div>
-                                    <div className="mt-4">
-                                        <Link
-                                            href={`/playground/pipeline?dataset_id=${profile.dataset_id}`}
-                                            className="inline-flex rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
-                                        >
-                                            Build Cleaning Pipeline →
-                                        </Link>
                                     </div>
                                 </section>
 
@@ -211,10 +221,10 @@ function ProfilePageContent() {
                                 <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
                                     <h2 className="text-2xl font-semibold">Dataset Preview</h2>
                                     <p className="mt-1 text-sm text-zinc-400">
-                                        Raw rows preview for quick inspection.
+                                        Raw rows preview (first 10 rows) for quick inspection.
                                     </p>
                                     <div className="mt-6">
-                                        <PreviewTable previewRows={profile.preview_rows} />
+                                        <PreviewTable previewRows={profile.preview_rows.slice(0, 10)} />
                                     </div>
                                 </section>
 
@@ -225,8 +235,22 @@ function ProfilePageContent() {
                                     onClose={() => setSelectedColumn(null)}
                                 />
                             </>
-                        ) : (
+                        )}
+
+                        {/* Visualize Tab */}
+                        {activeTab === "visualize" && (
                             <VisualizationTab datasetId={profile.dataset_id} columns={profile.columns} />
+                        )}
+
+                        {/* Pipeline Tab */}
+                        {activeTab === "pipeline" && (
+                            <PipelineTab
+                                datasetId={profile.dataset_id}
+                                columns={profile.columns}
+                                originalRowCount={profile.row_count}
+                                originalColumnCount={profile.column_count}
+                                onUploadSuccess={handleUploadSuccess}
+                            />
                         )}
                     </div>
                 )}
@@ -235,7 +259,6 @@ function ProfilePageContent() {
     );
 }
 
-// Wrap inside Suspense to avoid build-time optimization warnings for useSearchParams
 export default function Page() {
     return (
         <Suspense fallback={<div className="min-h-screen bg-zinc-950 text-zinc-100 p-10">Loading page...</div>}>
