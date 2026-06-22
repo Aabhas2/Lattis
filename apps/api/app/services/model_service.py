@@ -54,6 +54,7 @@ class ModelService:
 
         # Model Selection 
         model = None
+        le = None 
         if req.task_type == "regression": 
             if req.algorithm == "linear_regression": 
                 model = LinearRegression(

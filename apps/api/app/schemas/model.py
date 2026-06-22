@@ -22,3 +22,13 @@ class ModelTrainResponse(BaseModel):
     feature_importances: List[FeatureImportance] 
     target_column: str 
     features_used: List[str] 
+
+class ModelTrainQueueResponse(BaseModel): 
+    job_id: uuid.UUID 
+    status: str 
+
+class ModelJobStatusResponse(BaseModel): 
+    job_id: uuid.UUID 
+    status: str 
+    result: Optional[ModelTrainResponse] = None 
+    error_message: Optional[str] = None 
