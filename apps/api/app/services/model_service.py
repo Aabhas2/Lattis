@@ -50,7 +50,14 @@ class ModelService:
             X, y, train_size=req.train_split, random_state=42
         )
 
-        params = req.parameters or {} 
+        # Clean parameter values from the frontend (e.g., converting string "None" to Python None)
+        raw_params = req.parameters or {}
+        params = {}
+        for k, v in raw_params.items():
+            if v is None or v == "None" or v == "none" or v == "":
+                params[k] = None
+            else:
+                params[k] = v
 
         # Model Selection 
         model = None
@@ -182,7 +189,7 @@ class ModelService:
             }
         else: 
             cm = confusion_matrix(y_test, preds) 
-            classes = sorted(y_test.tolist() if req.algorithm == "xgboost" else y_train.unique().tolist()) 
+            classes = sorted(list(set(y_test.tolist())) if req.algorithm == "xgboost" else y_train.unique().tolist()) 
             classes_labels = [str(le.inverse_transform([c])[0]) for c in classes] if req.algorithm == "xgboost" else [str(c) for c in classes] 
 
             metrics = {

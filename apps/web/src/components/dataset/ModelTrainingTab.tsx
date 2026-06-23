@@ -297,7 +297,7 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                 <div className="space-y-1">
                                     <label className="text-xs text-zinc-400 font-semibold uppercase">Alpha (Regularization)</label>
                                     <select
-                                        value={parameters.alpha ?? 1.0}
+                                        value={String(parameters.alpha ?? 1.0)}
                                         onChange={(e) => setParameters({ ...parameters, alpha: parseFloat(e.target.value) })}
                                         className="w-full rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
                                     >
@@ -331,7 +331,7 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                     <div className="space-y-1">
                                         <label className="text-xs text-zinc-400 font-semibold uppercase">Max Depth</label>
                                         <select
-                                            value={parameters.max_depth ?? "None"}
+                                            value={parameters.max_depth !== null && parameters.max_depth !== undefined ? String(parameters.max_depth) : "None"}
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 setParameters({ ...parameters, max_depth: val === "None" ? null : parseInt(val) });
@@ -352,7 +352,7 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                         <div className="space-y-1">
                                             <label className="text-xs text-zinc-400 font-semibold uppercase">Min Samples Split</label>
                                             <select
-                                                value={parameters.min_samples_split ?? 2}
+                                                value={String(parameters.min_samples_split ?? 2)}
                                                 onChange={(e) => setParameters({ ...parameters, min_samples_split: parseInt(e.target.value) })}
                                                 className="w-full rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
                                             >
@@ -367,7 +367,7 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                         <div className="space-y-1">
                                             <label className="text-xs text-zinc-400 font-semibold uppercase">Class Weight</label>
                                             <select
-                                                value={parameters.class_weight ?? "None"}
+                                                value={parameters.class_weight !== null && parameters.class_weight !== undefined ? String(parameters.class_weight) : "None"}
                                                 onChange={(e) => setParameters({ ...parameters, class_weight: e.target.value === "None" ? null : e.target.value })}
                                                 className="w-full rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
                                             >
@@ -402,7 +402,7 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                     <div className="space-y-1">
                                         <label className="text-xs text-zinc-400 font-semibold uppercase">C (Regularization Penalty)</label>
                                         <select
-                                            value={parameters.C ?? 1.0}
+                                            value={String(parameters.C ?? 1.0)}
                                             onChange={(e) => setParameters({ ...parameters, C: parseFloat(e.target.value) })}
                                             className="w-full rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
                                         >
@@ -433,7 +433,7 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                     <div className="space-y-1">
                                         <label className="text-xs text-zinc-400 font-semibold uppercase">C (Margin Hardness)</label>
                                         <select
-                                            value={parameters.C ?? 1.0}
+                                            value={String(parameters.C ?? 1.0)}
                                             onChange={(e) => setParameters({ ...parameters, C: parseFloat(e.target.value) })}
                                             className="w-full rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
                                         >
