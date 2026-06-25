@@ -997,11 +997,11 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                                         {secondaryMetric}
                                                     </td>
                                                     <td className="py-3 px-3 text-[10px] text-zinc-500">
-                                                        {new Date(modelRun.create_at).toLocaleDateString([], { hour: '2-digit', minute: '2-digit' })} ({new Date(modelRun.create_at).toLocaleDateString()})
+                                                        {new Date(modelRun.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({new Date(modelRun.created_at).toLocaleDateString()})
                                                     </td>
                                                     <td className="py-3 px-3 text-right">
                                                         {isCurrent ? (
-                                                            <span className="inline-block px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 tet-[10px] font-bold">
+                                                            <span className="inline-block px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
                                                                 Active Run
                                                             </span>
                                                         ) : (
