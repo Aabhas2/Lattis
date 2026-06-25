@@ -220,3 +220,28 @@ export async function downloadDataset(datasetId: string, filename: string): Prom
     a.remove();
     window.URL.revokeObjectURL(url);
 }
+
+export async function runPrediction(
+    jobId: string,
+    inputs: Record<string, number>
+): Promise<{ prediction: string; confidence: number | null; task_type: string }> {
+    const response = await fetch(`${BASE_URL}/models/runs/${jobId}/predict`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inputs }),
+    });
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to make prediction.")
+    }
+    return response.json();
+}
+
+export async function getDatasetModels(datasetId: string): Promise<any[]> {
+    const response = await fetch(`${BASE_URL}/models/datasets/${datasetId}`);
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to fetch model history (${response.status}): ${text}`);
+    }
+    return response.json();
+}

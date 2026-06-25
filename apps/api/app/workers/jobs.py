@@ -20,7 +20,7 @@ def train_job(job_id: str, req_dict: dict, file_path: str):
         req = ModelTrainRequest(**req_dict) 
 
         # 4. Train and compute evaluation metrics 
-        result = ModelService().train_model(df, req) 
+        result = ModelService().train_model(df, req, job_id=job_id) 
 
         # 5. Update job status to COMPLETE with JSON payload results 
         crud.update_model_job_status(db, job_id, ModelJobStatus.COMPLETE, result=result)

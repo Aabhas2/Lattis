@@ -1,3 +1,6 @@
+import joblib
+import os 
+import joblib
 import numpy as np 
 import pandas as pd 
 from typing import Dict, Any, List 
@@ -23,7 +26,7 @@ except ImportError:
     LGBM_AVAILABLE = False 
 
 class ModelService: 
-    def train_model(self, df: pd.DataFrame, req: ModelTrainRequest) -> Dict[str, Any]: 
+    def train_model(self, df: pd.DataFrame, req: ModelTrainRequest, job_id: str = None) -> Dict[str, Any]: 
         if req.target_column not in df.columns: 
             raise ValueError(f"Target column '{req.target_column}' does not exist in dataset.")
 
@@ -227,6 +230,22 @@ class ModelService:
 
         # Sort weights cleanly using parameter x
         importances = sorted(importances, key=lambda x: x["importance"], reverse=True)
+
+        # Save model artifacts if job_id is provided 
+        if job_id:
+            # Ensure storage/models directory exists 
+            model_dir = os.path.join("storage","models") 
+            os.makedirs(model_dir, exist_ok=True) 
+
+            model_path = os.path.join(model_dir, f"{job_id}.joblib") 
+            model_data = {
+                "model": model, 
+                "features_used": features_used, 
+                "target_column": req.target_column, 
+                "task_type": req.task_type, 
+                "label_encoder": le # Saves the LabelEncoder (if used by XGBoost)
+            }
+            joblib.dump(model_data, model_path) 
 
         return {
             "task_type": req.task_type, 

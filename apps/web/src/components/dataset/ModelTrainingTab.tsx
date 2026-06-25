@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { trainModel, getModelJobStatus } from "../../lib/api";
+import { trainModel, getModelJobStatus, runPrediction, getDatasetModels } from "../../lib/api";
 import { ColumnProfile } from "../../lib/types";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Underdog } from "next/font/google";
 
 interface ModelTrainingTabProps {
     datasetId: string;
@@ -78,10 +79,53 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
     const [error, setError] = useState<string | null>(null);
     const [results, setResults] = useState<any | null>(null);
 
+    // Prediction state hooks 
+    const [predInputs, setPredInputs] = useState<Record<string, number>>({});
+    const [predictionResult, setPredictionResult] = useState<{ prediction: string; confidence: number | null; task_type: string } | null>(null);
+    const [predLoading, setPredLoading] = useState(false);
+    const [predError, setPredError] = useState<string | null>(null);
+
+    // Leaderboard state 
+    const [modelHistory, setModelHistory] = useState<any[]>([]);
+
     // SSR mounting check
     useEffect(() => {
         setIsMounted(true);
     }, []);
+
+    const fetchHistory = async () => {
+        if (!datasetId) return;
+        try {
+            const data = await getDatasetModels(datasetId);
+            setModelHistory(data);
+        } catch (err) {
+            console.error("Failed to load model history.", err);
+        }
+    };
+
+    useEffect(() => {
+        if (datasetId) {
+            fetchHistory();
+        }
+    }, [datasetId]);
+
+    const handleLoadModel = (modelRun: any) => {
+        setTargetCol(modelRun.target_column);
+        setTaskType(modelRun.task_type);
+        setAlgorithm(modelRun.algorithm);
+        setParameters(modelRun.parameters || {});
+        setSplit(modelRun.split || 0.8);
+        setJobId(modelRun.job_id);
+        setJobStatus("complete");
+        setResults({
+            metrics: modelRun.metrics,
+            feature_importances: modelRun.feature_importances,
+            features_used: modelRun.features_used,
+            target_column: modelRun.target_column,
+            algorithm: modelRun.algorithm,
+            task_type: modelRun.task_type
+        });
+    };
 
     // Set default algorithm whenever task type changes
     useEffect(() => {
@@ -157,6 +201,7 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                 if (data.status === "complete") {
                     setResults(data.result);
                     setLoading(false);
+                    fetchHistory();
                     clearInterval(interval);
                 } else if (data.status === "failed") {
                     setError(data.error_message || "Model training failed on the worker");
@@ -179,6 +224,18 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
         return () => clearInterval(interval);
     }, [jobId, jobStatus]);
 
+    useEffect(() => {
+        if (results?.features_used) {
+            const initialInputs: Record<string, number> = {};
+            results.features_used.forEach((feature: string) => {
+                initialInputs[feature] = 0;
+            });
+            setPredInputs(initialInputs);
+            setPredictionResult(null);
+            setPredError(null);
+        }
+    }, [results]);
+
     const handleTrain = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -197,6 +254,22 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
             setLoading(false);
         }
     };
+
+    const handlePredict = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!jobId) return;
+        setPredLoading(true);
+        setPredError(null);
+        setPredictionResult(null);
+        try {
+            const res = await runPrediction(jobId, predInputs);
+            setPredictionResult(res);
+        } catch (err) {
+            setPredError(err instanceof Error ? err.message : "Failed to run prediction");
+        } finally {
+            setPredLoading(false);
+        }
+    }
 
     const isNumeric = (col: ColumnProfile) => {
         return col.detected_type === "Numerical" ||
@@ -733,7 +806,7 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                                                 key={`${rIdx}-${cIdx}`}
                                                                 className={`aspect-square flex items-center justify-center rounded border transition text-sm ${isDiagonal
                                                                     ? "bg-emerald-950/40 border-emerald-800/80 text-emerald-400"
-                                                                    : "bg-rose-950/25 border-rose-900/35 text-rose-400"
+                                                                    : "bg-rose-950/25 border-rose-900/35 text-rose-450"
                                                                     }`}
                                                                 title={`True: ${results.metrics.classes?.[rIdx] || rIdx}, Pred: ${results.metrics.classes?.[cIdx] || cIdx}`}
                                                             >
@@ -778,10 +851,178 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                     </div>
                                 )}
                             </div>
+
+                            {/* Prediction Playground (renders below the two-column chart layout) */}
+                            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-4">
+                                <div>
+                                    <h5 className="text-sm font-semibold text-zinc-200">Prediction Playground</h5>
+                                    <p className="text-[10px] text-zinc-500">Enter values to run real-time predictions on the trained model</p>
+                                </div>
+                                <form onSubmit={handlePredict} className="space-y-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-h-[220px] overflow-y-auto pr-1">
+                                        {results.features_used.map((feature: string) => (
+                                            <div key={feature} className="space-y-1">
+                                                <label className="text-[10px] text-zinc-400 font-mono truncate block" title={feature}>
+                                                    {feature}
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    step="any"
+                                                    value={predInputs[feature] ?? 0}
+                                                    onChange={(e) => setPredInputs({
+                                                        ...predInputs,
+                                                        [feature]: parseFloat(e.target.value) || 0
+                                                    })}
+                                                    className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-200 outline-none focus:border-zinc-500"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row gap-4 items-center pt-2">
+                                        <button
+                                            type="submit"
+                                            disabled={predLoading}
+                                            className="w-full sm:w-auto rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 text-xs font-semibold transition disabled:opacity-50"
+                                        >
+                                            {predLoading ? "Predicting..." : "Predict →"}
+                                        </button>
+                                        {predError && (
+                                            <span className="text-xs text-rose-450">
+                                                ⚠️ {predError}
+                                            </span>
+                                        )}
+                                    </div>
+                                </form>
+
+                                {predictionResult && (
+                                    <div className="rounded-xl border border-emerald-800 bg-emerald-950/20 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in">
+                                        <div className="text-left">
+                                            <span className="block text-[10px] text-emerald-450 font-bold uppercase tracking-wider">Model Prediction</span>
+                                            <strong className="text-xl text-white font-mono">{predictionResult.prediction}</strong>
+                                        </div>
+                                        {predictionResult.confidence !== null && (
+                                            <div className="text-right sm:text-left">
+                                                <span className="block text-[10px] text-zinc-550">Confidence Score</span>
+                                                <strong className="text-lg text-emerald-400 font-mono">{(predictionResult.confidence * 100).toFixed(1)}%</strong>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
             </div>
+            {/* Model Comparison Leaderboard */}
+            {modelHistory.length > 0 && (
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4 animate-fade-in">
+                    <div className="flex justify-between items-center border-b border-zinc-850 pb-3">
+                        <div>
+                            <h4 className="text-sm font-bold text-zinc-200 uppercase tracking-wider">Model Comparison Leaderboard</h4>
+                            <p className="text-[10px] text-zinc-500">Ranking of all completed models trained on this dataset, categorized by current task type ({taskType})</p>
+                        </div>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 uppercase">
+                            {taskType}
+                        </span>
+                    </div>
+                    {modelHistory.filter(m => m.task_type === taskType).length === 0 ? (
+                        <p className="text-xs text-zinc-550 italic">No completed {taskType} models trained yet for this dataset.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs font-mono text-zinc-400">
+                                <thead>
+                                    <tr className="border-b border-zinc-850 text-zinc-500 text-[10px] font-bold uppercase tracking-wider">
+                                        <th className="py-2.5 px-3">Rank</th>
+                                        <th className="py-2.5 px-3">Trained At</th>
+                                        <th className="py-2.5 px-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-850/50">
+                                    {[...modelHistory]
+                                        .filter(m => m.task_type === taskType)
+                                        .sort((a, b) => {
+                                            if (taskType === "classification") {
+                                                const accA = a.metrics?.accuracy ?? 0;
+                                                const accB = b.metrics?.accuracy ?? 0;
+                                                return accB - accA;
+                                            } else {
+                                                const r2A = a.metrics?.r2 ?? - Infinity;
+                                                const r2B = b.metrics?.r2 ?? - Infinity;
+                                                return r2B - r2A;
+                                            }
+                                        })
+                                        .map((modelRun, idx) => {
+                                            const isCurrent = jobId === modelRun.job_id;
+                                            const rankMedal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`;
+                                            let primaryMetric = "N/A";
+                                            let secondaryMetric = "N/A";
+                                            if (taskType === "classification") {
+                                                primaryMetric = modelRun.metrics?.accuracy !== undefined
+                                                    ? `${(modelRun.metrics.accuracy * 100).toFixed(2)}%`
+                                                    : "N/A";
+                                                secondaryMetric = modelRun.metrics?.f1 !== undefined
+                                                    ? `F1: ${(modelRun.metrics.f1 * 100).toFixed(2)}%`
+                                                    : "N/A";
+                                            } else {
+                                                primaryMetric = modelRun.metrics?.r2 !== undefined
+                                                    ? modelRun.metrics.r2.toFixed(4)
+                                                    : "N/A";
+                                                secondaryMetric = modelRun.metrics?.rmse !== undefined
+                                                    ? `RMSE: ${modelRun.metrics.rmse.toFixed(4)}`
+                                                    : "N/A";
+                                            }
+                                            const formattedAlgo = ALGORITHM_INFO[modelRun.algorithm]?.title || modelRun.algorithm;
+
+                                            return (
+                                                <tr
+                                                    key={modelRun.job_id}
+                                                    className={`transition-colors hover:bg-zinc-850/20 ${isCurrent ? "bg-emerald-950/10" : ""}`}
+                                                >
+                                                    <td className="py-3 px-3 font-semibold text-zinc-350 text-sm">
+                                                        {rankMedal}
+                                                    </td>
+                                                    <td className="py-3 px-3">
+                                                        <span className="font-bold text-zinc-200">
+                                                            {formattedAlgo}
+                                                        </span>
+                                                        <span className="block text-[9px] text-zinc-550 mt-0.5">ID: {modelRun.job_id.slice(0, 8)}...</span>
+                                                    </td>
+                                                    <td className="py-3 px-3 text-zinc-300">
+                                                        {modelRun.target_column}
+                                                    </td>
+                                                    <td className="py-3 px-3 font-bold text-emerald-400">
+                                                        {primaryMetric}
+                                                    </td>
+                                                    <td className="py-3 px-3 text-zinc-500">
+                                                        {secondaryMetric}
+                                                    </td>
+                                                    <td className="py-3 px-3 text-[10px] text-zinc-500">
+                                                        {new Date(modelRun.create_at).toLocaleDateString([], { hour: '2-digit', minute: '2-digit' })} ({new Date(modelRun.create_at).toLocaleDateString()})
+                                                    </td>
+                                                    <td className="py-3 px-3 text-right">
+                                                        {isCurrent ? (
+                                                            <span className="inline-block px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 tet-[10px] font-bold">
+                                                                Active Run
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleLoadModel(modelRun)}
+                                                                className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 hover:text-white transition text-[10px] font-bold text-zinc-300 border border-zinc-750"
+                                                            >
+                                                                Load Model
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
