@@ -11,6 +11,7 @@ import ColumnDetailModal from "../components/dataset/ColumnDetailModal";
 import VisualizationTab from "../components/dataset/VisualizationTab";
 import PipelineTab from "../components/dataset/PipelineTab";
 import ModelTrainingTab from "../components/dataset/ModelTrainingTab";
+import MLSpaceTab from "../components/dataset/MLSpaceTab";
 import { useSearchParams } from "next/navigation";
 
 function ProfilePageContent() {
@@ -20,7 +21,7 @@ function ProfilePageContent() {
     const [isFetchingProfile, setIsFetchingProfile] = useState(false);
     const [selectedColumn, setSelectedColumn] = useState<ColumnProfile | null>(null);
     const [columnSearch, setColumnSearch] = useState("");
-    const [activeTab, setActiveTab] = useState<"overview" | "visualize" | "pipeline" | "model_train">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "visualize" | "pipeline" | "model_train" | "ml_space">("overview");
 
     const searchParams = useSearchParams();
     const datasetIdParam = searchParams.get("dataset_id");
@@ -201,6 +202,15 @@ function ProfilePageContent() {
                             >
                                 Train Model
                             </button>
+                            <button
+                                onClick={() => setActiveTab("ml_space")}
+                                className={`px-6 py-3 text-sm font-semibold border-b-2 transition ${activeTab === "ml_space"
+                                    ? "border-emerald-500 text-emerald-400"
+                                    : "border-transparent text-zinc-400 hover:text-zinc-200"
+                                    }`}
+                            >
+                                ML Space (3D)
+                            </button>
                         </div>
 
                         {/* Overview Tab */}
@@ -302,6 +312,14 @@ function ProfilePageContent() {
                                 datasetId={profile.dataset_id}
                                 columns={profile.columns}
                                 filename={profile.filename}
+                            />
+                        )}
+
+                        {/* 3D ML Space Tab */}
+                        {activeTab === "ml_space" && (
+                            <MLSpaceTab
+                                datasetId={profile.dataset_id}
+                                columns={profile.columns}
                             />
                         )}
 
