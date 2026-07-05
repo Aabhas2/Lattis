@@ -125,15 +125,22 @@ function ProfilePageContent() {
                 {view === "upload" && (
                     <div className="space-y-10">
                         {/* Hero Header */}
-                        <div className="text-center space-y-5 pt-8">
-                            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 text-emerald-400 text-xs font-semibold uppercase tracking-widest">
+                        <div className="text-center flex flex-col items-center pt-8 lg:pt-12">
+                            <div className="mb-6 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 text-emerald-400 text-[10px] md:text-xs font-semibold uppercase tracking-widest z-10 relative">
                                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                                 Open Source · No Sign-in Required
                             </div>
-                            <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
-                                <span className="text-zinc-100">Lattis</span>
-                            </h1>
-                            <p className="text-lg text-zinc-400 max-w-xl mx-auto leading-relaxed">
+                            
+                            {/* Logo Container with vertical cropping */}
+                            <div className="relative w-full max-w-[280px] md:max-w-[380px] lg:max-w-[460px] h-[80px] md:h-[100px] lg:h-[120px] flex justify-center items-center mb-6 overflow-hidden z-0">
+                                <img 
+                                    src="/logo.png" 
+                                    alt="Lattis" 
+                                    className="absolute w-full h-auto object-cover drop-shadow-[0_0_35px_rgba(16,185,129,0.25)] hover:scale-[1.02] transition-transform duration-300 cursor-pointer" 
+                                />
+                            </div>
+
+                            <p className="text-sm md:text-base lg:text-lg text-zinc-400 max-w-2xl mx-auto leading-relaxed relative z-10 font-medium">
                                 An interactive machine learning studio. Upload a dataset, build pipelines, train models, and explore predictions in an immersive 3D universe.
                             </p>
                         </div>
