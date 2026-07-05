@@ -6,6 +6,10 @@ import pandas as pd
 from typing import Dict, Any, List 
 from sklearn.model_selection import train_test_split 
 from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor 
+from sklearn.neighbors import KNeighborsClassifier 
+from sklearn.cluster import KMeans 
+from sklearn.decomposition import PCA
 from sklearn.svm import SVC 
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score 
@@ -27,17 +31,22 @@ except ImportError:
 
 class ModelService: 
     def train_model(self, df: pd.DataFrame, req: ModelTrainRequest, job_id: str = None) -> Dict[str, Any]: 
-        if req.target_column not in df.columns: 
-            raise ValueError(f"Target column '{req.target_column}' does not exist in dataset.")
-
         # Preprocessing and cleaning 
-        # Drop rows where target is missing 
-        df_clean = df.dropna(subset=[req.target_column]) 
-        if len(df_clean) < 10: 
-            raise ValueError("Dataset has too few samples for training (less than 10).") 
+        if req.algorithm == "kmeans": 
+            df_clean = df.copy() 
+            y = None 
+            X = df_clean 
+        else:
+            if req.target_column not in df.columns: 
+                raise ValueError(f"Target column '{req.target_column}' does not exist in dataset.")
 
-        y = df_clean[req.target_column] 
-        X = df_clean.drop(columns=[req.target_column]) 
+            # Drop rows where target is missing 
+            df_clean = df.dropna(subset=[req.target_column]) 
+            if len(df_clean) < 10: 
+                raise ValueError("Dataset has too few samples for training (less than 10).") 
+
+            y = df_clean[req.target_column] 
+            X = df_clean.drop(columns=[req.target_column]) 
 
         # Exclude non-numeric columns for feature set 
         X = X.select_dtypes(include=[np.number]) 
@@ -49,9 +58,14 @@ class ModelService:
         features_used = X.columns.tolist()  
 
         # Train test split 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, train_size=req.train_split, random_state=42
-        )
+        if req.algorithm != "kmeans": 
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, train_size=req.train_split, random_state=42
+            )
+        else: 
+            X_train, X_test = X, X
+            y_train, y_test = None, None
+
 
         # Clean parameter values from the frontend (e.g., converting string "None" to Python None)
         raw_params = req.parameters or {}
@@ -65,7 +79,13 @@ class ModelService:
         # Model Selection 
         model = None
         le = None 
-        if req.task_type == "regression": 
+
+        if req.algorithm == "kmeans": 
+            model = KMeans(
+                n_clusters=int(params.get("n_clusters", 3)), 
+                random_state=42
+            )
+        elif req.task_type == "regression": 
             if req.algorithm == "linear_regression": 
                 model = LinearRegression(
                     fit_intercept=params.get("fit_intercept", True), 
@@ -111,11 +131,17 @@ class ModelService:
                     n_jobs=-1, 
                     random_state=42 
                 )
+            elif req.algorithm == "decision_tree": 
+                model = DecisionTreeRegressor(
+                    max_depth=params.get("max_depth", None), 
+                    min_samples_split=int(params.get("min_samples_split", 2)), 
+                    random_state=42
+                )
             else: 
                 raise ValueError(f"Unsupported regression algorithm: {req.algorithm}") 
 
         elif req.task_type == "classification": 
-            if y_train.nunique() > 20: 
+            if y_train is not None and y_train.nunique() > 20: 
                 raise ValueError("Target column has too many unique values for a classification task.") 
 
             if req.algorithm == "logistic_regression": 
@@ -173,36 +199,57 @@ class ModelService:
                     n_jobs=-1, 
                     random_state=42 
                 )
+            elif req.algorithm == "decision_tree": 
+                model = DecisionTreeClassifier(
+                    max_depth=params.get("max_depth", None), 
+                    min_samples_split=int(params.get("min_samples_split", 2)), 
+                    random_state=42
+                )
+            elif req.algorithm == "knn": 
+                model = KNeighborsClassifier(
+                    n_neighbors=int(params.get("n_neighbors", 5)),
+                    weights=params.get("weights", "uniform"),
+                    n_jobs=-1
+                )
             else: 
                 raise ValueError(f"Unsupported classification algorithm: {req.algorithm}") 
         else: 
-            raise ValueError(f"Unsupported task type: {req.task_type}") 
+            raise ValueError(f"Unsupported task type: {req.task_type}")
 
         # Training 
-        model.fit(X_train, y_train) 
+        model.fit(X_train, y_train if y is not None else None) 
 
-        # Inference & Evaluation
-        preds = model.predict(X_test) 
         metrics = {} 
-        if req.task_type == "regression": 
-            metrics = {
-                "rmse": float(np.sqrt(mean_squared_error(y_test, preds))), 
-                "mae": float(mean_absolute_error(y_test, preds)), 
-                "r2": float(r2_score(y_test, preds))
-            }
-        else: 
-            cm = confusion_matrix(y_test, preds) 
-            classes = sorted(list(set(y_test.tolist())) if req.algorithm == "xgboost" else y_train.unique().tolist()) 
-            classes_labels = [str(le.inverse_transform([c])[0]) for c in classes] if req.algorithm == "xgboost" else [str(c) for c in classes] 
+        extra_data = {} 
 
+        if req.algorithm == "kmeans":
             metrics = {
-                "accuracy": float(accuracy_score(y_test, preds)),
-                "precision": float(precision_score(y_test, preds, average="macro", zero_division=0)), 
-                "recall": float(recall_score(y_test, preds, average="macro", zero_division=0)), 
-                "f1": float(f1_score(y_test, preds, average="macro", zero_division=0)), 
-                "confusion_matrix": cm.tolist(), 
-                "classes": classes_labels
-            }
+                "inertia": float(model.inertia_) 
+            } 
+            extra_data["cluster_centers"] = model.cluster_centers_.tolist() 
+
+        else: 
+            # Inference & Evaluation
+            preds = model.predict(X_test) 
+            if req.task_type == "regression": 
+                metrics = {
+                    "rmse": float(np.sqrt(mean_squared_error(y_test, preds))), 
+                    "mae": float(mean_absolute_error(y_test, preds)), 
+                    "r2": float(r2_score(y_test, preds))
+                }
+            else: 
+                cm = confusion_matrix(y_test, preds) 
+                classes = sorted(list(set(y_test.tolist())) if req.algorithm == "xgboost" else y_train.unique().tolist()) 
+                classes_labels = [str(le.inverse_transform([c])[0]) for c in classes] if req.algorithm == "xgboost" else [str(c) for c in classes] 
+
+                metrics = {
+                    "accuracy": float(accuracy_score(y_test, preds)),
+                    "precision": float(precision_score(y_test, preds, average="macro", zero_division=0)), 
+                    "recall": float(recall_score(y_test, preds, average="macro", zero_division=0)), 
+                    "f1": float(f1_score(y_test, preds, average="macro", zero_division=0)), 
+                    "confusion_matrix": cm.tolist(), 
+                    "classes": classes_labels
+                }
 
         # Extract feature importance / weights (DE-INDENTED OUT OF ELSE BLOCK)
         importances = [] 
@@ -219,13 +266,15 @@ class ModelService:
 
         # Normalize weights
         total_weight = np.sum(weights) 
-        if total_weight > 0: 
+        if total_weight > 0 and not np.isnan(total_weight): 
             weights = weights / total_weight 
+        else:
+            weights = np.zeros(len(features_used))
 
         for col, weight in zip(features_used, weights): 
             importances.append({
                 "feature": col, 
-                "importance": float(weight)
+                "importance": float(weight) if not np.isnan(weight) else 0.0
             })
 
         # Sort weights cleanly using parameter x
@@ -253,5 +302,7 @@ class ModelService:
             "metrics": metrics, 
             "feature_importances": importances, 
             "target_column": req.target_column, 
-            "features_used": features_used 
+            "features_used": features_used, 
+            "feature_names": features_used,
+            **extra_data
         }

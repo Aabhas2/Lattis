@@ -367,7 +367,7 @@ def get_dataset_visualization_data(dataset_id: uuid.UUID, model_id: Optional[uui
         if "regress" in algo and "logistic" not in algo:
             task_type = "Regression"
 
-    return {
+    response = {
         "points": points, 
         "target_column": target_col, 
         "coefficients": coefficients, 
@@ -376,6 +376,62 @@ def get_dataset_visualization_data(dataset_id: uuid.UUID, model_id: Optional[uui
         "tree": tree_data,
         "scale_params": scale_params,
         "task_type": task_type
-    }    
-                    
+    }
+
+    # Extract extra Unsupervised/Tree data from the model run result
+    if active_job and active_job.result:
+        if "cluster_centers" in active_job.result:
+            response["cluster_centers"] = active_job.result["cluster_centers"]
+        if "feature_names" in active_job.result:
+            response["feature_names"] = active_job.result["feature_names"]
+
+    # Compute proper PCA (StandardScaler -> PCA) for K-Means models, or if explicitly requested
+    if active_job and active_job.config.get("algorithm", "").lower() == "kmeans":
+        try:
+            from sklearn.preprocessing import StandardScaler
+            from sklearn.decomposition import PCA
+            
+            # Select raw numeric data, dropping entirely empty columns
+            X_raw = df[numeric_cols].dropna(axis=1, how="all")
+            
+            if X_raw.shape[1] >= 3:
+                X_raw = X_raw.fillna(X_raw.median())
+                
+                # 1. Scale properly to mean=0, var=1 (this centers the PCA projection)
+                scaler = StandardScaler()
+                X_scaled = scaler.fit_transform(X_raw)
+                
+                # 2. Fit PCA
+                pca = PCA(n_components=3)
+                pca.fit(X_scaled)
+            
+                response["pca_variance_ratio"] = pca.explained_variance_ratio_.tolist()
+                response["pca_components"] = pca.components_.tolist()
+                response["pca_mean"] = pca.mean_.tolist()
+                
+                # Calculate the transformed PCA coordinates for each point so the frontend doesn't have to
+                X_pca = pca.transform(X_scaled)
+                
+                # Scale the PCA output nicely into the [-10, 10] coordinate space bounds of the 3D grid
+                # This ensures the projection doesn't exceed the bounds of the visual universe.
+                for idx, pt in enumerate(points):
+                    # Standard scaling usually puts most data within [-3, 3]. We can roughly scale it up
+                    # to [-10, 10] with a multiplier, or just let it sit natively.
+                    # Since X_pca is standard scaled, multiplying by 3 gives a nice visual spread.
+                    pt["coords"]["pca_x"] = float(X_pca[idx, 0]) * 2.5
+                    pt["coords"]["pca_y"] = float(X_pca[idx, 1]) * 2.5
+                    pt["coords"]["pca_z"] = float(X_pca[idx, 2]) * 2.5
+
+                if "cluster_centers" in response and len(response["cluster_centers"]) > 0:
+                    try:
+                        centers_scaled = scaler.transform(response["cluster_centers"])
+                        centers_pca = pca.transform(centers_scaled)
+                        response["cluster_centers_pca"] = (centers_pca * 2.5).tolist()
+                    except Exception as e:
+                        print(f"Warning: Failed to compute PCA for cluster centers: {e}")
+
+        except Exception as e:
+            print(f"Warning: Failed to compute PCA: {e}")
+
+    return response
                 
