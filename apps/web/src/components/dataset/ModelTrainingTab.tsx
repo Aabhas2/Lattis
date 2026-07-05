@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trainModel, getModelJobStatus, runPrediction, getDatasetModels } from "../../lib/api";
 import { ColumnProfile } from "../../lib/types";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Underdog } from "next/font/google";
 
 interface ModelTrainingTabProps {
     datasetId: string;
@@ -79,6 +78,9 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
     const [error, setError] = useState<string | null>(null);
     const [results, setResults] = useState<any | null>(null);
 
+    // Flag to prevent the "clear results" effect from firing during model restoration
+    const isRestoringModel = useRef(false);
+
     // Prediction state hooks 
     const [predInputs, setPredInputs] = useState<Record<string, number>>({});
     const [predictionResult, setPredictionResult] = useState<{ prediction: string; confidence: number | null; task_type: string } | null>(null);
@@ -88,10 +90,44 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
     // Leaderboard state 
     const [modelHistory, setModelHistory] = useState<any[]>([]);
 
-    // SSR mounting check
+    // SSR mounting check & session restoration
     useEffect(() => {
         setIsMounted(true);
+        
+        const cachedTarget = sessionStorage.getItem("ml_playground_target_col");
+        const cachedTask = sessionStorage.getItem("ml_playground_task_type") as any;
+        const cachedAlgo = sessionStorage.getItem("ml_playground_algorithm");
+        const cachedJobId = sessionStorage.getItem("ml_playground_job_id");
+        const cachedStatus = sessionStorage.getItem("ml_playground_job_status") as any;
+        const cachedResults = sessionStorage.getItem("ml_playground_results");
+        const cachedSplit = sessionStorage.getItem("ml_playground_split");
+        const cachedParams = sessionStorage.getItem("ml_playground_parameters");
+
+        if (cachedTarget) setTargetCol(cachedTarget);
+        if (cachedTask) setTaskType(cachedTask);
+        if (cachedAlgo) setAlgorithm(cachedAlgo);
+        if (cachedJobId) setJobId(cachedJobId);
+        if (cachedStatus) setJobStatus(cachedStatus);
+        if (cachedResults) setResults(JSON.parse(cachedResults));
+        if (cachedSplit) setSplit(parseFloat(cachedSplit) || 0.8);
+        if (cachedParams) setParameters(JSON.parse(cachedParams));
     }, []);
+
+    // Sync state changes to sessionStorage for persistence across tab unmounts
+    useEffect(() => {
+        if (!isMounted) return;
+        sessionStorage.setItem("ml_playground_target_col", targetCol);
+        sessionStorage.setItem("ml_playground_task_type", taskType);
+        sessionStorage.setItem("ml_playground_algorithm", algorithm);
+        sessionStorage.setItem("ml_playground_split", split.toString());
+        sessionStorage.setItem("ml_playground_parameters", JSON.stringify(parameters));
+        if (jobId) sessionStorage.setItem("ml_playground_job_id", jobId);
+        else sessionStorage.removeItem("ml_playground_job_id");
+        if (jobStatus) sessionStorage.setItem("ml_playground_job_status", jobStatus);
+        else sessionStorage.removeItem("ml_playground_job_status");
+        if (results) sessionStorage.setItem("ml_playground_results", JSON.stringify(results));
+        else sessionStorage.removeItem("ml_playground_results");
+    }, [targetCol, taskType, algorithm, split, parameters, jobId, jobStatus, results, isMounted]);
 
     const fetchHistory = async () => {
         if (!datasetId) return;
@@ -110,6 +146,10 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
     }, [datasetId]);
 
     const handleLoadModel = (modelRun: any) => {
+        // Set the restoring flag BEFORE state changes so the clear-results effect
+        // knows to skip. The flag is reset after the microtask queue flushes.
+        isRestoringModel.current = true;
+
         setTargetCol(modelRun.target_column);
         setTaskType(modelRun.task_type);
         setAlgorithm(modelRun.algorithm);
@@ -125,19 +165,24 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
             algorithm: modelRun.algorithm,
             task_type: modelRun.task_type
         });
+
+        // Write the active model to localStorage so ML Space can read it
+        localStorage.setItem("active_model_job_id", modelRun.job_id);
+        localStorage.setItem("active_model_algorithm", modelRun.algorithm);
+        localStorage.setItem("active_model_target", modelRun.target_column);
+        // Dispatch a storage event so MLSpaceTab can react in the same window
+        window.dispatchEvent(new StorageEvent("storage", {
+            key: "active_model_job_id",
+            newValue: modelRun.job_id
+        }));
+
+        // Reset flag after all effects triggered by this batch have run
+        setTimeout(() => { isRestoringModel.current = false; }, 0);
     };
 
-    // Set default algorithm whenever task type changes
+    // Clear error and results when configuration changes — skip during model restoration
     useEffect(() => {
-        if (taskType === "regression") {
-            setAlgorithm("random_forest");
-        } else {
-            setAlgorithm("random_forest");
-        }
-    }, [taskType]);
-
-    // Clear error and results when configuration changes
-    useEffect(() => {
+        if (isRestoringModel.current) return;
         setError(null);
         setResults(null);
     }, [targetCol, taskType, algorithm]);
@@ -203,6 +248,16 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                     setLoading(false);
                     fetchHistory();
                     clearInterval(interval);
+                    // Expose newly trained model to ML Space via localStorage
+                    if (jobId) {
+                        localStorage.setItem("active_model_job_id", jobId);
+                        localStorage.setItem("active_model_algorithm", algorithm);
+                        localStorage.setItem("active_model_target", targetCol);
+                        window.dispatchEvent(new StorageEvent("storage", {
+                            key: "active_model_job_id",
+                            newValue: jobId
+                        }));
+                    }
                 } else if (data.status === "failed") {
                     setError(data.error_message || "Model training failed on the worker");
                     setLoading(false);
@@ -789,36 +844,52 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                             <p className="text-[10px] text-zinc-500">Rows are True categories, Cols are Predicted</p>
                                         </div>
 
-                                        <div className="flex flex-col items-center justify-center h-[260px] w-full">
-                                            <div
-                                                className="grid gap-1 font-mono text-[10px] text-center font-bold"
-                                                style={{
-                                                    gridTemplateColumns: `repeat(${results.metrics.confusion_matrix.length}, minmax(0, 1fr))`,
-                                                    width: "100%",
-                                                    maxWidth: "180px",
-                                                }}
-                                            >
-                                                {results.metrics.confusion_matrix.flatMap((row: number[], rIdx: number) =>
-                                                    row.map((val: number, cIdx: number) => {
-                                                        const isDiagonal = rIdx === cIdx;
-                                                        return (
-                                                            <div
-                                                                key={`${rIdx}-${cIdx}`}
-                                                                className={`aspect-square flex items-center justify-center rounded border transition text-sm ${isDiagonal
-                                                                    ? "bg-emerald-950/40 border-emerald-800/80 text-emerald-400"
-                                                                    : "bg-rose-950/25 border-rose-900/35 text-rose-450"
-                                                                    }`}
-                                                                title={`True: ${results.metrics.classes?.[rIdx] || rIdx}, Pred: ${results.metrics.classes?.[cIdx] || cIdx}`}
-                                                            >
-                                                                {val}
+                                        <div className="flex flex-col items-center justify-center gap-3 h-[260px] w-full">
+                                            {/* Predicted label row */}
+                                            <div className="flex flex-col items-center gap-1 w-full max-w-[220px]">
+                                                <span className="text-[9px] text-zinc-500 font-semibold uppercase tracking-widest mb-1">Predicted →</span>
+                                                {/* Column headers */}
+                                                {results.metrics.classes && (
+                                                    <div className="flex gap-1 self-end pr-0" style={{ paddingLeft: "32px" }}>
+                                                        {results.metrics.classes.map((cls: any, i: number) => (
+                                                            <div key={i} className="text-[9px] text-zinc-500 font-mono text-center font-bold" style={{ minWidth: "44px" }}>
+                                                                {String(cls).slice(0, 6)}
                                                             </div>
-                                                        );
-                                                    })
+                                                        ))}
+                                                    </div>
                                                 )}
+                                                {/* Grid with row labels */}
+                                                {results.metrics.confusion_matrix.map((row: number[], rIdx: number) => (
+                                                    <div key={rIdx} className="flex items-center gap-1">
+                                                        {/* Row label */}
+                                                        <div className="text-[9px] text-zinc-500 font-mono font-bold text-right" style={{ minWidth: "28px" }}>
+                                                            {results.metrics.classes?.[rIdx] !== undefined
+                                                                ? String(results.metrics.classes[rIdx]).slice(0, 4)
+                                                                : rIdx}
+                                                        </div>
+                                                        {row.map((val: number, cIdx: number) => {
+                                                            const isDiagonal = rIdx === cIdx;
+                                                            return (
+                                                                <div
+                                                                    key={`${rIdx}-${cIdx}`}
+                                                                    className={`flex items-center justify-center rounded border font-mono font-bold text-sm transition ${isDiagonal
+                                                                        ? "bg-emerald-950/40 border-emerald-800/80 text-emerald-400"
+                                                                        : "bg-rose-950/25 border-rose-900/35 text-rose-450"
+                                                                        }`}
+                                                                    style={{ width: "44px", height: "44px" }}
+                                                                    title={`True: ${results.metrics.classes?.[rIdx] ?? rIdx}, Pred: ${results.metrics.classes?.[cIdx] ?? cIdx}`}
+                                                                >
+                                                                    {val}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ))}
+                                                <span className="text-[9px] text-zinc-500 font-semibold uppercase tracking-widest -rotate-90 absolute -left-6">True ↓</span>
                                             </div>
 
                                             {/* Legend */}
-                                            <div className="flex gap-4 mt-4 text-[10px] text-zinc-550 font-semibold font-mono">
+                                            <div className="flex gap-4 text-[10px] text-zinc-550 font-semibold font-mono">
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="h-2 w-2 rounded bg-emerald-950 border border-emerald-800"></div>
                                                     <span>Correct</span>
@@ -933,6 +1004,10 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                 <thead>
                                     <tr className="border-b border-zinc-850 text-zinc-500 text-[10px] font-bold uppercase tracking-wider">
                                         <th className="py-2.5 px-3">Rank</th>
+                                        <th className="py-2.5 px-3">Algorithm</th>
+                                        <th className="py-2.5 px-3">Target</th>
+                                        <th className="py-2.5 px-3 text-emerald-500/70">{taskType === "classification" ? "Accuracy" : "R²"}</th>
+                                        <th className="py-2.5 px-3">{taskType === "classification" ? "F1 Score" : "RMSE"}</th>
                                         <th className="py-2.5 px-3">Trained At</th>
                                         <th className="py-2.5 px-3 text-right">Action</th>
                                     </tr>
