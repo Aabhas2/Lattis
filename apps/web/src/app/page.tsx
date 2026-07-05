@@ -131,11 +131,10 @@ function ProfilePageContent() {
                                 Open Source · No Sign-in Required
                             </div>
                             <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
-                                <span className="text-zinc-100">ML </span>
-                                <span style={{ background: "linear-gradient(135deg, #10b981 0%, #06b6d4 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Playground</span>
+                                <span className="text-zinc-100">Lattis</span>
                             </h1>
                             <p className="text-lg text-zinc-400 max-w-xl mx-auto leading-relaxed">
-                                Upload a dataset. Profile it. Build a preprocessing pipeline. Train ML models. Explore predictions in an interactive 3D space.
+                                An interactive machine learning studio. Upload a dataset, build pipelines, train models, and explore predictions in an immersive 3D universe.
                             </p>
                         </div>
 

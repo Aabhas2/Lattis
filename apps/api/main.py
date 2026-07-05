@@ -6,7 +6,7 @@ from app.api.router import api_router
 from app.db.session import ping_db 
 from app.utils.redis_client import ping_redis 
 
-app = FastAPI(title="ML Playground API", version="0.1")
+app = FastAPI(title="Lattis API", version="0.1")
 
 #CORS for local dev (Next.js) 
 app.add_middleware(

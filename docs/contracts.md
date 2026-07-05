@@ -1,4 +1,4 @@
-# ML Playground - API Contracts (v0.1) 
+# Lattis - API Contracts (v0.1) 
 
 This document defines the JSON contracts exchanged between the frontend (Next.js) and the backend (FastAPI). 
 Goal: keep responses stable so UI + backend can evolve without breaking each other. 

@@ -1,77 +1,116 @@
-# ML Playground
+# Lattis — Interactive Machine Learning Studio
 
-ML Playground is an interactive, web-based sandbox designed for dataset profiling, data cleaning, automated pipeline building, and model training. Built as a high-performance portfolio application, it enables users to upload datasets, analyze feature properties, clean/transform their data step-by-step, and queue machine learning models asynchronously in the background.
+**Lattis** is an interactive machine learning studio for experimenting with data preprocessing, model training, evaluation, and immersive 3D visualization. It combines an end-to-end ML workflow with a custom built Three.js-powered ML Universe, enabling users to explore datasets, compare models, and understand machine learning visually.
 
----
+![Lattis Dashboard](./docs/preview.png) *(Note: Add a screenshot here)*
 
-## 🚀 Tech Stack
+## 🚀 Features
 
-### Frontend
-* **Framework:** Next.js (React)
-* **Styling:** Vanilla CSS & TailwindCSS (Dark theme, glassmorphism UI)
-* **Charts & Analytics:** Recharts (Interactive histograms, boxplots, scatter plots, feature importance bar charts)
-* **3D Rendering:** Three.js / React Three Fiber (for model structures & high-dimensional decision boundary visualizations)
+### 1. Dataset Profiling & Cleaning
+- **Upload & Parse:** Drag and drop `.csv` files.
+- **Statistical Analysis:** Automatic calculation of mean, median, standard deviation, and missing values.
+- **Categorical Insights:** Fast value-count binning and distributions.
 
-### Backend
-* **API Framework:** FastAPI (Python)
-* **Task Queue:** Redis Queue (RQ) for async, non-blocking model training
-* **Database:** PostgreSQL with SQLAlchemy ORM
-* **Migrations:** Alembic
-* **Cache & Broker:** Redis
+### 2. Pipeline Builder (No-Code Preprocessing)
+- Build robust scikit-learn preprocessing pipelines visually.
+- Support for One-Hot Encoding, Label Encoding, Standard Scaling, MinMax Scaling, and custom Missing Value Imputations (Mean, Median, Mode, Constant).
 
-### Machine Learning
-* **Libraries:** Scikit-Learn, XGBoost, LightGBM, Pandas, NumPy
+### 3. Model Training Engine
+- Train models asynchronously.
+- **Algorithms Supported:**
+  - Classification: Logistic Regression, Random Forest, XGBoost, LightGBM, Decision Trees, SVM, KNN
+  - Regression: Linear Regression, Ridge, Random Forest, XGBoost, LightGBM
+  - Clustering: K-Means (with auto-PCA projection for visualization)
+- **Live Metrics:** Accuracy, F1-Score, RMSE, R², and live Confusion Matrices.
 
----
+### 4. The ML Universe (WebGL / Three.js)
+Explore your dataset and model predictions in a fully immersive 3D space.
+- **Data Points:** Millions of rows rendered using WebGL instanced particle systems.
+- **Decision Boundaries:** Interpolated 3D surfaces showing regression planes or classification boundaries.
+- **Clusters & PCA:** Soft volumetric cluster clouds and dynamic PCA projections.
+- **Feature Pillars:** Real-time feature importance visualizations hovering above the dataset.
+- **Live Predictions:** Send arbitrary input vectors through the trained model and watch the "Probe" fly through the 3D space to the nearest neighbors in real-time.
+- **Cinematic Settings:** Control scene presets (Cinematic, Bright, High Contrast) and adjust particle sizes dynamically.
 
-## 🛠 Features Implemented (Current State)
+## 🏗️ Architecture
 
-### 1. Dataset Profiling & Overview
-* CSV/XLSX file upload validation and backend parsing.
-* Interactive overview dashboard providing metrics on total rows, columns, missing values, and numerical ratios.
-* Column-by-column deep profile insights (detected datatype, null percentage, cardinality, median, standard deviation, and value distribution charts).
-* Inline sample table previewing the raw uploaded dataset.
+Lattis is built as a distributed, containerized application designed for scale and performance.
 
-### 2. Interactive Visualizations
-* Dynamic scroll-driven correlation matrix map.
-* Interactive scatter plots (custom $X$ and $Y$ column selectors).
-* Feature-specific boxplots and bin-adjustable histograms.
-* Graceful fallback placeholders for empty datasets or non-conforming features.
+```text
+                  ┌────────────────────────┐
+                  │                        │
+                  │   Lattis Web Client    │
+                  │   (Next.js + React)    │
+                  │                        │
+                  └───────────┬────────────┘
+                              │
+                    REST API (JSON / HTTP)
+                              │
+                  ┌───────────▼────────────┐
+                  │                        │
+                  │   FastAPI ML Engine    │
+                  │       (Python)         │
+                  │                        │
+                  └─────┬────────────┬─────┘
+                        │            │
+            Jobs        │            │   Read/Write
+          (RQ Enqueue)  │            │  (SQLAlchemy)
+                        │            │
+            ┌───────────▼──┐      ┌──▼───────────┐
+            │              │      │              │
+            │    Redis     │      │  PostgreSQL  │
+            │ (Task Queue) │      │  (Metadata)  │
+            │              │      │              │
+            └──────┬───────┘      └──────────────┘
+                   │
+           Dequeue │
+                   │
+            ┌──────▼───────┐
+            │              │
+            │  RQ Workers  │
+            │(Model Train) │
+            │              │
+            └──────────────┘
+```
 
-### 3. Pipeline Builder (Transformations)
-* Multi-step pipeline builder with chronological operations lists.
-* Data transformations supported:
-  * Drop redundant/unused columns.
-  * Impute missing values (median, mean, custom placeholders).
-  * Datatype cast adjustments.
-  * One-hot encoding of categorical variables.
-* Instant step preview: Compares post-operation dataset shapes (rows/cols) prior to execution.
-* Direct handoff of the generated cleaned dataset version for subsequent modeling.
+## 🛠️ Technology Stack
 
-### 4. Async Model Training Sandbox
-* Hyperparameter customization sliders and toggles for multiple estimators:
-  * **Regression:** Linear Regression, Ridge, Random Forest, Gradient Boosting, XGBoost, LightGBM.
-  * **Classification:** Logistic Regression, Random Forest, Gradient Boosting, SVM, XGBoost, LightGBM.
-* Asynchronous background queuing using Redis Queue (RQ) preventing request timeouts.
-* Dynamic status polling indicators showing queue states (`queued` ➔ `running` ➔ `complete` / `failed`).
-* Model performance evaluation dashboard:
-  * R-squared (R²), RMSE, and MAE for regression.
-  * Accuracy, Macro F1-score, Macro Precision, and an interactive colored Confusion Matrix for classification.
-  * Normalized relative feature importance bar charts.
+- **Frontend:** Next.js, React, Tailwind CSS, Three.js, React Three Fiber.
+- **Backend API:** FastAPI, Pydantic, SQLAlchemy.
+- **Machine Learning:** Scikit-learn, XGBoost, LightGBM, Pandas, Numpy.
+- **Infrastructure:** Docker, Docker Compose, PostgreSQL, Redis, RQ (Redis Queue).
 
----
+## ⚡ Local Development
 
-## 📝 Roadmap & Future Goals
+Lattis comes with a `docker-compose.yml` file that orchestrates the entire stack (PostgreSQL, Redis, FastAPI backend, and Background Workers) locally with one command.
 
-- [ ] **Interactive 3D Visualizer (Three.js):** Build a real-time, interactive 3D model visualization dashboard (using Three.js / React Three Fiber) to render decision boundaries, multi-dimensional scatter clusters, or decision tree graph nodes.
-- [ ] **Model Download & Export:** Enable downloading trained model files (`.pkl` / `.joblib` / ONNX formats) for local runtime inference.
-- [ ] **Code Generation:** Generate standalone Python scripts reproducing the exact cleaning pipeline and model hyperparameters.
-- [ ] **Batch Deployments:** Integrate a single-click API deployment block to expose the trained model as a REST API endpoint.
-- [ ] **Pre-training scaling:** Add options to standard-scale, min-max normalize, or select features prior to model fit.
+### 1. Prerequisites
+- Docker and Docker Compose
+- Node.js 18+
 
----
+### 2. Start the Backend Stack (API, DB, Redis)
+```bash
+docker-compose up --build
+```
+This will start:
+- FastAPI server on `http://localhost:8000`
+- PostgreSQL on port `5432`
+- Redis on port `6379`
+- RQ Worker listening to the default queue
 
-## 🏁 Usecases
+### 3. Start the Frontend
+In a new terminal window:
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+The web application will be available at `http://localhost:3000`.
 
-* **ML Education Sandbox:** Great visual aid for teaching how features are drop-mapped, models are fit, and performance metrics vary with custom hyperparameters.
-* **Rapid Prototyping:** Allows users to quickly test multiple scikit-learn/gradient boosted models on small-to-medium tabular datasets in minutes without writing code.
+## 🚢 Recommended Production Deployment
+
+- **Frontend:** Vercel (zero-config, edge caching)
+- **Backend (FastAPI, Redis, Postgres, RQ Worker):** Railway or Render (native Dockerfile support, easy internal networking)
+
+## 📄 License
+MIT License
