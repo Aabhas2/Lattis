@@ -1,4 +1,4 @@
-export type VisualizationMode = "dataset" | "boundary" | "tree" | "importance";
+export type VisualizationMode = "dataset" | "boundary" | "tree" | "importance" | "clusters" | "pca";
 
 export interface PointData {
     id: number;
@@ -16,6 +16,21 @@ export interface VisualizationData {
     tree: TreeNode | null;
     scale_params: Record<string, { min: number; max: number; mean: number }>;
     task_type: string;
+    cluster_centers?: number[][];
+    pca_variance_ratio?: number[];
+    pca_components?: number[][];
+    pca_mean?: number[];
+    cluster_centers_pca?: number[][];
+    feature_names?: string[];
+}
+
+export type ScenePreset = "cinematic" | "bright" | "high_contrast" | "dark";
+
+export interface VisualizationSettings {
+    preset: ScenePreset;
+    pointSizeMultiplier: number;
+    showGrid: boolean;
+    showLabels: boolean;
 }
 
 export interface TreeNode {

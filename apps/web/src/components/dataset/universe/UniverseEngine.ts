@@ -1,11 +1,12 @@
 import * as THREE from "three";
 import { ColumnProfile } from "../../../lib/types";
-import { UniverseConfig, VisualizationData, VisualizationMode } from "./types";
+import { UniverseConfig, VisualizationData, VisualizationMode, VisualizationSettings } from "./types";
 import { SceneManager } from "./SceneManager";
 import { CameraManager } from "./CameraManager";
 import { DatasetRenderer } from "./DatasetRenderer";
 import { ModelSurfaceRenderer } from "./ModelSurfaceRenderer";
 import { TreeRenderer } from "./TreeRenderer";
+import { ClusterRenderer } from "./ClusterRenderer";
 import { PredictionAnimator } from "./PredictionAnimator";
 import { HoverManager } from "./HoverManager";
 import { normalizeValue } from "./utils/normalize";
@@ -21,6 +22,7 @@ export class UniverseEngine {
     public datasetRenderer!: DatasetRenderer;
     public modelSurfaceRenderer!: ModelSurfaceRenderer;
     public treeRenderer!: TreeRenderer;
+    public clusterRenderer!: ClusterRenderer;
     private predictionAnimator!: PredictionAnimator;
     public hoverManager!: HoverManager;
 
@@ -51,6 +53,7 @@ export class UniverseEngine {
         this.datasetRenderer = new DatasetRenderer(this.sceneManager.scene);
         this.modelSurfaceRenderer = new ModelSurfaceRenderer(this.sceneManager.scene);
         this.treeRenderer = new TreeRenderer(this.sceneManager.scene);
+        this.clusterRenderer = new ClusterRenderer(this.sceneManager.scene);
 
         this.predictionAnimator = new PredictionAnimator(this.sceneManager.scene);
         this.hoverManager = new HoverManager(this.canvas, this.cameraManager.camera, this.sceneManager.scene);
@@ -72,6 +75,7 @@ export class UniverseEngine {
         this.datasetRenderer.update(time);
         this.modelSurfaceRenderer.update();
         this.predictionAnimator.update();
+        this.clusterRenderer?.update(time);
         this.axisLabeler?.update(this.cameraManager.camera);
 
         this.hoverManager.update({
@@ -104,21 +108,62 @@ export class UniverseEngine {
         this.axisLabeler?.updateLabels(xAxis, yAxis, zAxis);
     }
 
+    public updateSettings(settings: VisualizationSettings) {
+        this.sceneManager.applyPreset(settings.preset);
+        this.datasetRenderer.setPointSizeMultiplier(settings.pointSizeMultiplier);
+        this.sceneManager.setGridVisible(settings.showGrid);
+        this.toggleLabels(settings.showLabels);
+    }
+
     public toggleLabels(show: boolean) {
         if (this.axisLabeler) {
             this.axisLabeler.setVisible(show);
         }
     }
 
+    private currentData: VisualizationData | null = null;
+
     public loadData(data: VisualizationData) {
+        this.currentData = data;
         this.datasetRenderer.setData(data.points, this.xAxis, this.yAxis, this.zAxis);
         this.modelSurfaceRenderer.updateData(data, this.xAxis, this.yAxis, this.zAxis);
         this.treeRenderer.updateData(data);
+        if (this.clusterRenderer) {
+            this.clusterRenderer.updateData(data, this.xAxis, this.yAxis, this.zAxis);
+        }
     }
 
     public setMode(mode: VisualizationMode) {
         this.modelSurfaceRenderer.setMode(mode);
         this.treeRenderer.setMode(mode);
+        if (this.clusterRenderer) {
+            this.clusterRenderer.setMode(mode);
+        }
+        
+        // Handle dataset positions based on mode
+        if (mode === "pca") {
+            this.datasetRenderer.updateAxes("pca_x", "pca_y", "pca_z");
+            this.axisLabeler?.updateLabels("PC1", "PC2", "PC3");
+            this.toggleLabels(true);
+            
+            // Rebuild clusters in PCA space
+            if (this.clusterRenderer && this.currentData) {
+                this.clusterRenderer.updateData(this.currentData, "pca_x", "pca_y", "pca_z");
+            }
+        } else if (mode === "dataset" || mode === "boundary" || mode === "clusters") {
+            this.datasetRenderer.updateAxes(this.xAxis, this.yAxis, this.zAxis);
+            this.axisLabeler?.updateLabels(this.xAxis, this.yAxis, this.zAxis);
+            this.toggleLabels(true);
+            
+            // Restore original clusters
+            if (this.clusterRenderer && this.currentData) {
+                this.clusterRenderer.updateData(this.currentData, this.xAxis, this.yAxis, this.zAxis);
+            }
+        } else {
+            // Tree or importance: hide dataset points or keep them as is
+            this.datasetRenderer.updateAxes(this.xAxis, this.yAxis, this.zAxis);
+            this.toggleLabels(false);
+        }
     }
 
     private onPredictionLandedCallback: ((neighbors: any[]) => void) | null = null;
@@ -190,11 +235,31 @@ export class UniverseEngine {
     }
 
     public onHover(callback: (payload: any | null) => void) {
-        this.hoverManager.onHover(callback);
+        this.hoverManager.onHover((payload) => {
+            if (payload && payload.type === "point") {
+                const pt = this.datasetRenderer.rawPoints[payload.index];
+                if (pt) {
+                    payload.raw = pt.raw;
+                    payload.target = pt.target;
+                    payload.coords = pt.coords;
+                }
+            }
+            callback(payload);
+        });
     }
 
     public onClick(callback: (payload: any | null) => void) {
-        this.hoverManager.onClick(callback);
+        this.hoverManager.onClick((payload) => {
+            if (payload && payload.type === "point") {
+                const pt = this.datasetRenderer.rawPoints[payload.index];
+                if (pt) {
+                    payload.raw = pt.raw;
+                    payload.target = pt.target;
+                    payload.coords = pt.coords;
+                }
+            }
+            callback(payload);
+        });
     }
 
     public destroy() {

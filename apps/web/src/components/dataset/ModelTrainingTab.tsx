@@ -241,6 +241,14 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
         } else if (algorithm === "svm") {
             defaults.C = 1.0;
             defaults.kernel = "rbf";
+        } else if (algorithm === "kmeans") {
+            defaults.n_clusters = 3;
+        } else if (algorithm === "decision_tree") {
+            defaults.max_depth = "None";
+            defaults.min_samples_split = 2;
+        } else if (algorithm === "knn") {
+            defaults.n_neighbors = 5;
+            defaults.weights = "uniform";
         }
         setParameters(defaults);
     }, [algorithm, taskType]);
@@ -912,7 +920,14 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                         <div className="space-y-6 animate-fade-in">
                             {/* Score Metrics Row */}
                             <div className="grid grid-cols-3 gap-4">
-                                {taskType === "regression" ? (
+                                {algorithm === "kmeans" ? (
+                                    <div className="col-span-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+                                        <span className="block text-[10px] text-zinc-550 font-semibold uppercase">Inertia (Within-Cluster Sum of Squares)</span>
+                                        <span className="block mt-1.5 text-xl font-bold font-mono text-emerald-400">
+                                            {results.metrics.inertia !== undefined ? results.metrics.inertia.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "N/A"}
+                                        </span>
+                                    </div>
+                                ) : taskType === "regression" ? (
                                     <>
                                         <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
                                             <span className="block text-[10px] text-zinc-550 font-semibold uppercase">R-Squared (R²)</span>

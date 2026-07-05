@@ -59,6 +59,12 @@ const RocketIcon = () => (
         <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" /><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
     </svg>
 );
+const SettingsIcon = () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+);
 
 export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -92,7 +98,12 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showLabels, setShowLabels] = useState(true);
-
+    
+    // UI Settings state
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [preset, setPreset] = useState<"cinematic" | "bright" | "high_contrast" | "dark">("cinematic");
+    const [pointSizeMultiplier, setPointSizeMultiplier] = useState(1.0);
+    const [showGrid, setShowGrid] = useState(true);
     // Read active model from localStorage on mount and listen for changes
     useEffect(() => {
         const readActiveModel = () => {
@@ -229,12 +240,17 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
         }
     }, [activeMode]);
 
-    // 4. Toggle labels
+    // 4. Update Visualization Settings
     useEffect(() => {
         if (engineRef.current) {
-            engineRef.current.toggleLabels(showLabels);
+            engineRef.current.updateSettings({
+                preset,
+                pointSizeMultiplier,
+                showGrid,
+                showLabels
+            });
         }
-    }, [showLabels]);
+    }, [preset, pointSizeMultiplier, showGrid, showLabels]);
 
     // Trigger local feature inputs when model parameters are loaded
     useEffect(() => {
@@ -309,25 +325,32 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800">
                 <div className="flex flex-wrap gap-2">
                     {[
-                        { key: "dataset", label: "Dataset Space", Icon: DatasetIcon },
-                        { key: "boundary", label: "Decision Boundary", Icon: BoundaryIcon },
-                        { key: "tree", label: "Decision Tree", Icon: TreeIcon },
-                        { key: "clusters", label: "Clusters", Icon: ClustersIcon },
-                        { key: "pca", label: "PCA Projection", Icon: PCAIcon },
-                        { key: "importance", label: "Feature Pillars", Icon: PillarsIcon },
-                    ].map(({ key, label, Icon }) => (
-                        <button
-                            key={key}
-                            onClick={() => setActiveMode(key as any)}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition border ${activeMode === key
-                                    ? "bg-emerald-600/20 text-emerald-300 border-emerald-600/50 shadow-emerald-500/10 shadow-md"
-                                    : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600 hover:text-zinc-200"
-                                }`}
-                        >
-                            <Icon />
-                            {label}
-                        </button>
-                    ))}
+                        { key: "dataset", label: "Dataset Space", Icon: DatasetIcon, supported: ["all"] },
+                        { key: "boundary", label: "Decision Boundary", Icon: BoundaryIcon, supported: ["linear_regression", "ridge", "logistic_regression"] },
+                        { key: "tree", label: "Decision Tree", Icon: TreeIcon, supported: ["decision_tree", "random_forest"] },
+                        { key: "clusters", label: "Clusters", Icon: ClustersIcon, supported: ["kmeans"] },
+                        { key: "pca", label: "PCA Projection", Icon: PCAIcon, supported: ["kmeans"] },
+                        { key: "importance", label: "Feature Pillars", Icon: PillarsIcon, supported: ["linear_regression", "ridge", "logistic_regression", "decision_tree", "random_forest", "gradient_boosting", "xgboost", "lightgbm"] },
+                    ].map(({ key, label, Icon, supported }) => {
+                        const isSupported = supported.includes("all") || (activeModelAlgo && supported.includes(activeModelAlgo));
+                        
+                        // Hide buttons that are not supported by the current active algorithm (except dataset which is always supported)
+                        if (!isSupported) return null;
+
+                        return (
+                            <button
+                                key={key}
+                                onClick={() => setActiveMode(key as any)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition border ${activeMode === key
+                                        ? "bg-emerald-600/20 text-emerald-300 border-emerald-600/50 shadow-emerald-500/10 shadow-md"
+                                        : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600 hover:text-zinc-200"
+                                    }`}
+                            >
+                                <Icon />
+                                {label}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -378,6 +401,59 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
                         {isFullscreen ? <><CollapseIcon /> Exit Space</> : <><ExpandIcon /> Expand</>}
                     </button>
 
+                    {/* Settings Panel Toggle */}
+                    <div className="absolute top-4 right-4 z-20 flex flex-col items-end">
+                        <button
+                            onClick={() => setSettingsOpen(!settingsOpen)}
+                            className={`bg-zinc-900/40 hover:bg-zinc-800/80 border border-zinc-700/50 text-zinc-300 hover:text-white p-2.5 rounded-lg backdrop-blur-md transition shadow-lg flex items-center justify-center ${settingsOpen ? 'bg-zinc-800/80 text-white border-emerald-500/50' : ''}`}
+                        >
+                            <SettingsIcon />
+                        </button>
+
+                        {settingsOpen && (
+                            <div className="mt-2 w-64 bg-zinc-950/90 backdrop-blur-xl border border-zinc-700/50 p-4 rounded-xl shadow-2xl flex flex-col gap-4 text-xs font-mono text-zinc-300">
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-zinc-500 font-semibold uppercase tracking-wider text-[10px]">Scene Preset</label>
+                                    <select 
+                                        value={preset} 
+                                        onChange={(e) => setPreset(e.target.value as any)} 
+                                        className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1.5 text-zinc-200 outline-none w-full"
+                                    >
+                                        <option value="cinematic">✨ Cinematic</option>
+                                        <option value="bright">☀️ Bright</option>
+                                        <option value="high_contrast">📊 High Contrast</option>
+                                        <option value="dark">🌑 Dark</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex flex-col gap-1.5">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-zinc-500 font-semibold uppercase tracking-wider text-[10px]">Point Size</label>
+                                        <span className="text-emerald-400 font-bold">{pointSizeMultiplier.toFixed(1)}x</span>
+                                    </div>
+                                    <input 
+                                        type="range" 
+                                        min="0.1" max="3.0" step="0.1" 
+                                        value={pointSizeMultiplier} 
+                                        onChange={(e) => setPointSizeMultiplier(parseFloat(e.target.value))}
+                                        className="w-full accent-emerald-500 cursor-pointer"
+                                    />
+                                </div>
+
+                                <div className="flex flex-col gap-2 border-t border-zinc-800/60 pt-3">
+                                    <label className="flex items-center gap-2 cursor-pointer hover:text-white transition">
+                                        <input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} className="accent-emerald-500" />
+                                        Show Ground Grid
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer hover:text-white transition">
+                                        <input type="checkbox" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} className="accent-emerald-500" />
+                                        Show Axis Labels
+                                    </label>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     <canvas ref={canvasRef} className="w-full h-full block" />
 
                     {/* Empty state overlays for model-required modes */}
@@ -406,9 +482,33 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
                         <div className="absolute bottom-4 left-4 bg-zinc-950/70 backdrop-blur-xl border border-zinc-700/50 p-4 rounded-xl text-xs space-y-1.5 shadow-2xl font-mono text-zinc-300 max-w-[280px] pointer-events-none animate-fade-in select-none z-10">
                             {hoveredItem.type === "point" && (
                                 <>
-                                    <span className="block text-[9px] text-zinc-400 font-bold uppercase">Dataset Probe</span>
-                                    <strong className="text-white text-sm">Data Row Index: {hoveredItem.index}</strong>
-                                    <span className="block text-[10px] text-zinc-500">Ray Distance: {hoveredItem.distance.toFixed(2)}</span>
+                                    <div className="flex justify-between items-center pb-1 border-b border-zinc-800/60 mb-1">
+                                        <span className="block text-[10px] text-zinc-400 font-bold uppercase">Row #{hoveredItem.index}</span>
+                                        {hoveredItem.target !== undefined && hoveredItem.target !== null && (
+                                            <span className="bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider">
+                                                Target: {hoveredItem.target}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="space-y-1 mt-2 max-h-[150px] overflow-hidden">
+                                        {hoveredItem.raw ? (
+                                            <>
+                                                {Object.entries(hoveredItem.raw).slice(0, 4).map(([k, v]) => (
+                                                    <div key={k} className="flex justify-between gap-4">
+                                                        <span className="text-zinc-500 truncate max-w-[120px]">{k}</span>
+                                                        <span className="text-zinc-200 font-bold">{v !== null ? String(v) : "NaN"}</span>
+                                                    </div>
+                                                ))}
+                                                {Object.keys(hoveredItem.raw).length > 4 && (
+                                                    <div className="text-[9px] text-zinc-600 text-center italic mt-1 pt-1 border-t border-zinc-800/40">
+                                                        +{Object.keys(hoveredItem.raw).length - 4} more features
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <div className="text-[10px] text-zinc-500 italic text-center">No raw features available</div>
+                                        )}
+                                    </div>
                                 </>
                             )}
                             {hoveredItem.type === "pillar" && (
