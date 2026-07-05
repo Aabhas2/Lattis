@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ColumnProfile } from "../../lib/types";
+import { ColumnProfile, NumericStats, CategoricalStats } from "../../lib/types";
 import { runPrediction } from "../../lib/api";
 
 interface MLSpaceTabProps {
@@ -382,18 +382,68 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
 
                         <form onSubmit={handleTriggerPrediction} className="space-y-3">
                             <div className="space-y-2.5 max-h-[200px] overflow-y-auto pr-1">
-                                {numericCols.map(col => (
-                                    <div key={col.name} className="flex justify-between items-center gap-2">
-                                        <label className="font-mono text-zinc-450 truncate max-w-[130px]" title={col.name}>{col.name}</label>
-                                        <input
-                                            type="number"
-                                            step="any"
-                                            value={predInputs[col.name] ?? 0}
-                                            onChange={(e) => setPredInputs({ ...predInputs, [col.name]: parseFloat(e.target.value) || 0 })}
-                                            className="w-[90px] bg-zinc-950 border border-zinc-850 rounded px-2 py-1 text-zinc-300 text-right outline-none focus:border-zinc-550"
-                                        />
-                                    </div>
-                                ))}
+                                {numericCols.map(col => {
+                                    const colProfile = columns.find(c => c.name === col.name);
+                                    const isSelectable = colProfile && (
+                                        colProfile.detected_type === "Boolean" ||
+                                        colProfile.unique_count <= 8
+                                    );
+
+                                    let options: { label: string; value: number }[] = [];
+                                    if (colProfile) {
+                                        if (colProfile.detected_type === "Boolean") {
+                                            options = [
+                                                { label: "0 (No)", value: 0 },
+                                                { label: "1 (Yes)", value: 1 }
+                                            ];
+                                        } else if (colProfile.stats && "top_values" in colProfile.stats) {
+                                            const top = (colProfile.stats as CategoricalStats).top_values || [];
+                                            options = top.map(t => {
+                                                const valNum = parseFloat(String(t.value));
+                                                return {
+                                                    label: String(t.value),
+                                                    value: isNaN(valNum) ? 0 : valNum
+                                                };
+                                            });
+                                        }
+                                    }
+
+                                    return (
+                                        <div key={col.name} className="flex flex-col gap-1 border-b border-zinc-800/40 pb-2">
+                                            <div className="flex justify-between items-center gap-2">
+                                                <label className="font-mono text-zinc-450 truncate max-w-[130px]" title={col.name}>{col.name}</label>
+                                                {isSelectable && options.length > 0 ? (
+                                                    <select
+                                                        value={predInputs[col.name] ?? 0}
+                                                        onChange={(e) => setPredInputs({ ...predInputs, [col.name]: parseFloat(e.target.value) || 0 })}
+                                                        className="w-[90px] bg-zinc-950 border border-zinc-850 rounded px-2 py-1 text-zinc-350 text-right outline-none focus:border-zinc-555 text-xs"
+                                                    >
+                                                        {options.map((opt, i) => (
+                                                            <option key={i} value={opt.value}>
+                                                                {opt.label}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <input
+                                                        type="number"
+                                                        step="any"
+                                                        min={colProfile?.stats && "min" in colProfile.stats ? (colProfile.stats as NumericStats).min ?? undefined : undefined}
+                                                        max={colProfile?.stats && "max" in colProfile.stats ? (colProfile.stats as NumericStats).max ?? undefined : undefined}
+                                                        value={predInputs[col.name] ?? ""}
+                                                        onChange={(e) => setPredInputs({ ...predInputs, [col.name]: e.target.value === "" ? 0 : parseFloat(e.target.value) || 0 })}
+                                                        className="w-[90px] bg-zinc-950 border border-zinc-850 rounded px-2 py-1 text-zinc-300 text-right outline-none focus:border-zinc-550 text-xs"
+                                                    />
+                                                )}
+                                            </div>
+                                            {!isSelectable && colProfile?.stats && "min" in colProfile.stats && (
+                                                <span className="block text-[8px] text-zinc-500 text-right font-mono">
+                                                    [{(colProfile.stats as NumericStats).min} - {(colProfile.stats as NumericStats).max}]
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                             <button
                                 type="submit"

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { trainModel, getModelJobStatus, runPrediction, getDatasetModels } from "../../lib/api";
-import { ColumnProfile } from "../../lib/types";
+import { ColumnProfile, NumericStats, CategoricalStats } from "../../lib/types";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface ModelTrainingTabProps {
@@ -283,13 +283,30 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
         if (results?.features_used) {
             const initialInputs: Record<string, number> = {};
             results.features_used.forEach((feature: string) => {
-                initialInputs[feature] = 0;
+                const colProfile = columns.find(c => c.name === feature);
+                if (colProfile) {
+                    if (colProfile.detected_type === "Boolean") {
+                        initialInputs[feature] = 0; // Default to 0 (No)
+                    } else if (colProfile.detected_type === "Numerical" && colProfile.stats && "mean" in colProfile.stats) {
+                        const stats = colProfile.stats as NumericStats;
+                        initialInputs[feature] = stats.mean !== null ? Math.round(stats.mean * 100) / 100 : 0;
+                    } else if (colProfile.stats && "top_values" in colProfile.stats) {
+                        const stats = colProfile.stats as CategoricalStats;
+                        const topVal = stats.top_values?.[0]?.value;
+                        const parsedVal = parseFloat(String(topVal));
+                        initialInputs[feature] = isNaN(parsedVal) ? 0 : parsedVal;
+                    } else {
+                        initialInputs[feature] = 0;
+                    }
+                } else {
+                    initialInputs[feature] = 0;
+                }
             });
             setPredInputs(initialInputs);
             setPredictionResult(null);
             setPredError(null);
         }
-    }, [results]);
+    }, [results, columns]);
 
     const handleTrain = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -931,23 +948,76 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                 </div>
                                 <form onSubmit={handlePredict} className="space-y-4">
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-h-[220px] overflow-y-auto pr-1">
-                                        {results.features_used.map((feature: string) => (
-                                            <div key={feature} className="space-y-1">
-                                                <label className="text-[10px] text-zinc-400 font-mono truncate block" title={feature}>
-                                                    {feature}
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    step="any"
-                                                    value={predInputs[feature] ?? 0}
-                                                    onChange={(e) => setPredInputs({
-                                                        ...predInputs,
-                                                        [feature]: parseFloat(e.target.value) || 0
-                                                    })}
-                                                    className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-200 outline-none focus:border-zinc-500"
-                                                />
-                                            </div>
-                                        ))}
+                                        {results.features_used.map((feature: string) => {
+                                            const colProfile = columns.find(c => c.name === feature);
+                                            const isSelectable = colProfile && (
+                                                colProfile.detected_type === "Boolean" ||
+                                                colProfile.unique_count <= 8
+                                            );
+
+                                            let options: { label: string; value: number }[] = [];
+                                            if (colProfile) {
+                                                if (colProfile.detected_type === "Boolean") {
+                                                    options = [
+                                                        { label: "0 (No)", value: 0 },
+                                                        { label: "1 (Yes)", value: 1 }
+                                                    ];
+                                                } else if (colProfile.stats && "top_values" in colProfile.stats) {
+                                                    const top = (colProfile.stats as CategoricalStats).top_values || [];
+                                                    options = top.map(t => {
+                                                        const valNum = parseFloat(String(t.value));
+                                                        return {
+                                                            label: String(t.value),
+                                                            value: isNaN(valNum) ? 0 : valNum
+                                                        };
+                                                    });
+                                                }
+                                            }
+
+                                            return (
+                                                <div key={feature} className="space-y-1">
+                                                    <label className="text-[10px] text-zinc-400 font-mono truncate block" title={feature}>
+                                                        {feature}
+                                                    </label>
+                                                    {isSelectable && options.length > 0 ? (
+                                                        <select
+                                                            value={predInputs[feature] ?? 0}
+                                                            onChange={(e) => setPredInputs({
+                                                                ...predInputs,
+                                                                [feature]: parseFloat(e.target.value) || 0
+                                                            })}
+                                                            className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-200 outline-none focus:border-zinc-550"
+                                                        >
+                                                            {options.map((opt, i) => (
+                                                                <option key={i} value={opt.value}>
+                                                                    {opt.label}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    ) : (
+                                                        <div>
+                                                            <input
+                                                                type="number"
+                                                                step="any"
+                                                                min={colProfile?.stats && "min" in colProfile.stats ? (colProfile.stats as NumericStats).min ?? undefined : undefined}
+                                                                max={colProfile?.stats && "max" in colProfile.stats ? (colProfile.stats as NumericStats).max ?? undefined : undefined}
+                                                                value={predInputs[feature] ?? ""}
+                                                                onChange={(e) => setPredInputs({
+                                                                    ...predInputs,
+                                                                    [feature]: e.target.value === "" ? 0 : parseFloat(e.target.value) || 0
+                                                                })}
+                                                                className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-200 outline-none focus:border-zinc-550"
+                                                            />
+                                                            {colProfile?.stats && "min" in colProfile.stats && (
+                                                                <span className="block text-[9px] text-zinc-500 mt-0.5">
+                                                                    Range: [{(colProfile.stats as NumericStats).min} - {(colProfile.stats as NumericStats).max}]
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                     <div className="flex flex-col sm:flex-row gap-4 items-center pt-2">
                                         <button
