@@ -393,65 +393,68 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
                         background: "radial-gradient(circle at center, #18181b 0%, #09090b 60%, #000000 100%)"
                     }}
                 >
-                    {/* Fullscreen toggle button */}
-                    <button
-                        onClick={toggleFullscreen}
-                        className="absolute top-4 left-4 z-20 bg-zinc-900/40 hover:bg-zinc-800/80 border border-zinc-700/50 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg backdrop-blur-md font-mono text-[10px] uppercase tracking-wider transition shadow-lg flex items-center gap-1.5"
-                    >
-                        {isFullscreen ? <><CollapseIcon /> Exit Space</> : <><ExpandIcon /> Expand</>}
-                    </button>
-
-                    {/* Settings Panel Toggle */}
-                    <div className="absolute top-4 right-4 z-20 flex flex-col items-end">
+                    {/* Top Left Controls */}
+                    <div className="absolute top-4 left-4 z-20 flex gap-2 items-stretch">
+                        {/* Fullscreen toggle button */}
                         <button
-                            onClick={() => setSettingsOpen(!settingsOpen)}
-                            className={`bg-zinc-900/40 hover:bg-zinc-800/80 border border-zinc-700/50 text-zinc-300 hover:text-white p-2.5 rounded-lg backdrop-blur-md transition shadow-lg flex items-center justify-center ${settingsOpen ? 'bg-zinc-800/80 text-white border-emerald-500/50' : ''}`}
+                            onClick={toggleFullscreen}
+                            className="bg-zinc-900/40 hover:bg-zinc-800/80 border border-zinc-700/50 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg backdrop-blur-md font-mono text-[10px] uppercase tracking-wider transition shadow-lg flex items-center gap-1.5"
                         >
-                            <SettingsIcon />
+                            {isFullscreen ? <><CollapseIcon /> Exit Space</> : <><ExpandIcon /> Expand</>}
                         </button>
 
-                        {settingsOpen && (
-                            <div className="mt-2 w-64 bg-zinc-950/90 backdrop-blur-xl border border-zinc-700/50 p-4 rounded-xl shadow-2xl flex flex-col gap-4 text-xs font-mono text-zinc-300">
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-zinc-500 font-semibold uppercase tracking-wider text-[10px]">Scene Preset</label>
-                                    <select 
-                                        value={preset} 
-                                        onChange={(e) => setPreset(e.target.value as any)} 
-                                        className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1.5 text-zinc-200 outline-none w-full"
-                                    >
-                                        <option value="cinematic">✨ Cinematic</option>
-                                        <option value="bright">☀️ Bright</option>
-                                        <option value="high_contrast">📊 High Contrast</option>
-                                        <option value="dark">🌑 Dark</option>
-                                    </select>
-                                </div>
+                        {/* Settings Panel Toggle */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setSettingsOpen(!settingsOpen)}
+                                className={`bg-zinc-900/40 hover:bg-zinc-800/80 border border-zinc-700/50 text-zinc-300 hover:text-white w-8 rounded-lg backdrop-blur-md transition shadow-lg flex items-center justify-center h-full ${settingsOpen ? 'bg-zinc-800/80 text-white border-emerald-500/50' : ''}`}
+                            >
+                                <SettingsIcon />
+                            </button>
 
-                                <div className="flex flex-col gap-1.5">
-                                    <div className="flex justify-between items-center">
-                                        <label className="text-zinc-500 font-semibold uppercase tracking-wider text-[10px]">Point Size</label>
-                                        <span className="text-emerald-400 font-bold">{pointSizeMultiplier.toFixed(1)}x</span>
+                            {settingsOpen && (
+                                <div className="absolute top-full left-0 mt-2 w-64 bg-zinc-950/90 backdrop-blur-xl border border-zinc-700/50 p-4 rounded-xl shadow-2xl flex flex-col gap-4 text-xs font-mono text-zinc-300">
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-zinc-500 font-semibold uppercase tracking-wider text-[10px]">Scene Preset</label>
+                                        <select 
+                                            value={preset} 
+                                            onChange={(e) => setPreset(e.target.value as any)} 
+                                            className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1.5 text-zinc-200 outline-none w-full"
+                                        >
+                                            <option value="cinematic">✨ Cinematic</option>
+                                            <option value="bright">☀️ Bright</option>
+                                            <option value="high_contrast">📊 High Contrast</option>
+                                            <option value="dark">🌑 Dark</option>
+                                        </select>
                                     </div>
-                                    <input 
-                                        type="range" 
-                                        min="0.1" max="3.0" step="0.1" 
-                                        value={pointSizeMultiplier} 
-                                        onChange={(e) => setPointSizeMultiplier(parseFloat(e.target.value))}
-                                        className="w-full accent-emerald-500 cursor-pointer"
-                                    />
-                                </div>
 
-                                <div className="flex flex-col gap-2 border-t border-zinc-800/60 pt-3">
-                                    <label className="flex items-center gap-2 cursor-pointer hover:text-white transition">
-                                        <input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} className="accent-emerald-500" />
-                                        Show Ground Grid
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer hover:text-white transition">
-                                        <input type="checkbox" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} className="accent-emerald-500" />
-                                        Show Axis Labels
-                                    </label>
+                                    <div className="flex flex-col gap-1.5">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-zinc-500 font-semibold uppercase tracking-wider text-[10px]">Point Size</label>
+                                            <span className="text-emerald-400 font-bold">{pointSizeMultiplier.toFixed(1)}x</span>
+                                        </div>
+                                        <input 
+                                            type="range" 
+                                            min="0.1" max="3.0" step="0.1" 
+                                            value={pointSizeMultiplier} 
+                                            onChange={(e) => setPointSizeMultiplier(parseFloat(e.target.value))}
+                                            className="w-full accent-emerald-500 cursor-pointer"
+                                        />
+                                    </div>
+
+                                    <div className="flex flex-col gap-2 border-t border-zinc-800/60 pt-3">
+                                        <label className="flex items-center gap-2 cursor-pointer hover:text-white transition">
+                                            <input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} className="accent-emerald-500" />
+                                            Show Ground Grid
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer hover:text-white transition">
+                                            <input type="checkbox" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} className="accent-emerald-500" />
+                                            Show Axis Labels
+                                        </label>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
 
                     <canvas ref={canvasRef} className="w-full h-full block" />
