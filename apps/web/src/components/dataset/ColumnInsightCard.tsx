@@ -91,7 +91,7 @@ export default function ColumnInsightCard({
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="break-words text-base font-semibold text-zinc-100">{column.name}</h3>
+          <h3 className="wrap-break-word text-base font-semibold text-zinc-100">{column.name}</h3>
           <p className="mt-0.5 text-xs text-zinc-500 font-mono">{column.dtype}</p>
         </div>
         <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${typeStyling.badge}`}>
