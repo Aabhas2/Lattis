@@ -867,9 +867,11 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                                 <span className="text-[9px] text-zinc-500 font-semibold uppercase tracking-widest mb-1">Predicted →</span>
                                                 {/* Column headers */}
                                                 {results.metrics.classes && (
-                                                    <div className="flex gap-1 self-end pr-0" style={{ paddingLeft: "32px" }}>
+                                                    <div className="flex items-center gap-1">
+                                                        {/* Leading spacer matching the row label width */}
+                                                        <div style={{ width: "28px" }} />
                                                         {results.metrics.classes.map((cls: any, i: number) => (
-                                                            <div key={i} className="text-[9px] text-zinc-500 font-mono text-center font-bold" style={{ minWidth: "44px" }}>
+                                                            <div key={i} className="text-[9px] text-zinc-550 font-mono text-center font-bold" style={{ width: "44px" }}>
                                                                 {String(cls).slice(0, 6)}
                                                             </div>
                                                         ))}
