@@ -150,6 +150,7 @@ export default function ColumnDetailModal({
                         tick={{ fill: "#a1a1aa", fontSize: 12 }}
                       />
                       <Tooltip
+                        cursor={false}
                         contentStyle={{
                           backgroundColor: "#09090b",
                           border: "1px solid #27272a",
@@ -214,6 +215,7 @@ export default function ColumnDetailModal({
                         tick={{ fill: "#a1a1aa", fontSize: 12 }}
                       />
                       <Tooltip
+                        cursor={false}
                         contentStyle={{
                           backgroundColor: "#09090b",
                           border: "1px solid #27272a",
