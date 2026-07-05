@@ -34,7 +34,7 @@ export class AxisLabeler {
 
     private makeTextSprite(text: string, color: string): THREE.Sprite {
         const canvas = document.createElement("canvas");
-        canvas.width = 256;
+        canvas.width = 384; // Increased from 256 to fit arrow
         canvas.height = 64;
 
         const ctx = canvas.getContext("2d");
@@ -57,13 +57,22 @@ export class AxisLabeler {
 
         // Text 
         ctx.fillStyle = color;
-        ctx.font = "bold 22px 'Inter', 'system-ui', sans-serif";
+        ctx.font = "bold 20px 'Inter', 'system-ui', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
         // Truncate long names 
-        const label = text.length > 14 ? text.slice(0, 12) + "…" : text;
-        ctx?.fillText(label, canvas.width / 2, canvas.height / 2);
+        const labelName = text.length > 12 ? text.slice(0, 10) + "…" : text;
+        
+        // Extract axis prefix (X, Y, Z or PC1, etc)
+        // Since we don't know which axis this is from just the text, we'll infer it from the color
+        let axisName = "";
+        if (color === "#f87171") axisName = "X ────────► ";
+        if (color === "#4ade80") axisName = "Y ────────► ";
+        if (color === "#60a5fa") axisName = "Z ────────► ";
+        
+        const fullLabel = axisName + labelName;
+        ctx?.fillText(fullLabel, canvas.width / 2, canvas.height / 2);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.needsUpdate = true;

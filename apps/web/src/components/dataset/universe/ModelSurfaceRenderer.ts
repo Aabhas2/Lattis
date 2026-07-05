@@ -140,17 +140,48 @@ export class ModelSurfaceRenderer {
 
             // Normalize height 
             const targetHeight = imp.importance * 8;
-            const geometry = new THREE.BoxGeometry(1.2, 0.1, 1.2);
-            const material = new THREE.MeshStandardMaterial({
+            const geometry = new THREE.CylinderGeometry(0.6, 0.6, targetHeight + 0.1, 16);
+            
+            // Holographic Material
+            const material = new THREE.MeshBasicMaterial({
                 color: new THREE.Color(COLORS.positive),
-                roughness: 0.2,
-                metalness: 0.8
+                transparent: true,
+                opacity: 0.4,
+                wireframe: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
             });
 
             const pillar = new THREE.Mesh(geometry, material);
-            pillar.position.set(x, -10 + 0.05, z);
-            pillar.castShadow = true;
-            pillar.receiveShadow = true;
+            const yOffset = -10 + (targetHeight / 2);
+            pillar.position.set(x, yOffset, z);
+
+            // Floating Label Sprite
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.fillStyle = 'rgba(0,0,0,0)';
+                ctx.fillRect(0, 0, 256, 128);
+                ctx.font = 'bold 24px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = COLORS.positive;
+                
+                // Truncate feature name
+                const shortFeat = imp.feature.length > 12 ? imp.feature.slice(0, 10) + '..' : imp.feature;
+                ctx.fillText(shortFeat, 128, 64);
+                
+                // Add value underneath
+                ctx.font = '16px monospace';
+                ctx.fillStyle = '#9ca3af';
+                ctx.fillText((imp.importance * 100).toFixed(1) + '%', 128, 96);
+            }
+            const labelTex = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: labelTex, transparent: true, depthTest: false, blending: THREE.AdditiveBlending });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(6, 3, 1);
+            sprite.position.set(x, yOffset + (targetHeight / 2) + 2.0, z); // Hover above pillar
 
             // Cache data attributes for hover events and growing animations 
             pillar.userData = {
@@ -161,6 +192,7 @@ export class ModelSurfaceRenderer {
             };
 
             this.pillarsGroup!.add(pillar);
+            this.pillarsGroup!.add(sprite);
         });
 
         this.scene.add(this.pillarsGroup);

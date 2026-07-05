@@ -6,7 +6,7 @@ import { lerp } from "./utils/lerp";
 export class DatasetRenderer {
     private scene: THREE.Scene;
     private pointsMesh: THREE.Points | null = null;
-    private rawPoints: PointData[] = [];
+    public rawPoints: PointData[] = [];
 
     // Double arrays: current pos states vs target offsets 
     private currentPositions: Float32Array | null = null;
@@ -16,14 +16,21 @@ export class DatasetRenderer {
     private yAxis: string = "";
     private zAxis: string = "";
 
-    // Hover feedback
+    // Interaction feedback
     private hoverSprite: THREE.Sprite;
+    private selectedSprite: THREE.Sprite;
     private hoveredIndex: number | null = null;
+    private selectedIndex: number | null = null;
+
+    // Sizing
+    private basePointSize: number = 0.25;
+    private sizeMultiplier: number = 1.0;
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
 
-        const spriteMat = new THREE.SpriteMaterial({
+        // Hover Sprite
+        const hoverMat = new THREE.SpriteMaterial({
             map: this.createParticleTexture(),
             color: new THREE.Color(COLORS.highlight),
             transparent: true,
@@ -31,10 +38,23 @@ export class DatasetRenderer {
             blending: THREE.AdditiveBlending,
             depthWrite: false
         });
-        this.hoverSprite = new THREE.Sprite(spriteMat);
+        this.hoverSprite = new THREE.Sprite(hoverMat);
         this.hoverSprite.scale.set(1.5, 1.5, 1.5);
         this.hoverSprite.visible = false;
         this.scene.add(this.hoverSprite);
+
+        // Selected Sprite (◉)
+        const selectedMat = new THREE.SpriteMaterial({
+            map: this.createSelectedTexture(),
+            color: new THREE.Color(COLORS.highlight),
+            transparent: true,
+            opacity: 0,
+            depthWrite: false
+        });
+        this.selectedSprite = new THREE.Sprite(selectedMat);
+        this.selectedSprite.scale.set(2.5, 2.5, 1);
+        this.selectedSprite.visible = false;
+        this.scene.add(this.selectedSprite);
     }
 
     public setData(points: PointData[], xAxis: string, yAxis: string, zAxis: string) {
@@ -45,10 +65,17 @@ export class DatasetRenderer {
 
         this.removePoints();
 
-        const count = points.length;
-        this.currentPositions = new Float32Array(count * 3);
-        this.targetPositions = new Float32Array(count * 3);
-        const colors = new Float32Array(count * 3);
+        this.currentPositions = new Float32Array(points.length * 3);
+        this.targetPositions = new Float32Array(points.length * 3);
+        this.startPositions = new Float32Array(points.length * 3);
+
+        // Auto-scale base size based on dataset size
+        if (points.length < 50) this.basePointSize = 1.0; // Large spheres
+        else if (points.length < 300) this.basePointSize = 0.45; // Medium
+        else if (points.length < 1000) this.basePointSize = 0.25; // Standard
+        else this.basePointSize = 0.12; // Fine dust
+
+        const colors = new Float32Array(points.length * 3);
 
         const targetValues = points
             .map(p => p.target)
@@ -103,19 +130,26 @@ export class DatasetRenderer {
         texture.needsUpdate = true;
 
         const material = new THREE.PointsMaterial({
-            size: 0.25, // World units, creates 3D depth perception
+            size: this.basePointSize * this.sizeMultiplier,
             sizeAttenuation: true, 
             vertexColors: true,
             transparent: true,
             opacity: 1.0,
             map: texture,
-            alphaTest: 0.01, // Forces WebGL to respect alpha map bounds even if state is dirty
-            depthWrite: false, // Prevents alpha sorting bugs (points disappearing)
-            blending: THREE.AdditiveBlending // Premium glowing look
+            alphaTest: 0.01,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
         });
 
         this.pointsMesh = new THREE.Points(geometry, material);
         this.scene.add(this.pointsMesh);
+    }
+
+    public setPointSizeMultiplier(mult: number) {
+        this.sizeMultiplier = mult;
+        if (this.pointsMesh) {
+            (this.pointsMesh.material as THREE.PointsMaterial).size = this.basePointSize * this.sizeMultiplier;
+        }
     }
 
     private morphStartTime: number = 0;
@@ -186,7 +220,6 @@ export class DatasetRenderer {
             this.pointsMesh.geometry.attributes.position.needsUpdate = true;
         }
 
-        // Hover Sprite Tracking & Animation
         if (this.hoveredIndex !== null) {
             this.hoverSprite.visible = true;
             const idx = this.hoveredIndex * 3;
@@ -199,10 +232,43 @@ export class DatasetRenderer {
         } else {
             this.hoverSprite.visible = false;
         }
+
+        if (this.selectedIndex !== null) {
+            this.selectedSprite.visible = true;
+            const idx = this.selectedIndex * 3;
+            this.selectedSprite.position.set(positions[idx], positions[idx + 1], positions[idx + 2]);
+            this.selectedSprite.material.opacity = 0.9;
+        } else {
+            this.selectedSprite.visible = false;
+        }
     }
     
     public setHoveredIndex(index: number | null) {
         this.hoveredIndex = index;
+    }
+
+    public setSelectedIndex(index: number | null) {
+        this.selectedIndex = index;
+    }
+
+    private createSelectedTexture(): THREE.CanvasTexture {
+        const canvas = document.createElement("canvas");
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext("2d")!;
+        
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(32, 32, 24, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(32, 32, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        return new THREE.CanvasTexture(canvas);
     }
 
     private createParticleTexture(): THREE.CanvasTexture {
@@ -228,7 +294,11 @@ export class DatasetRenderer {
         if (this.pointsMesh) {
             this.scene.remove(this.pointsMesh);
             this.pointsMesh.geometry.dispose();
-            (this.pointsMesh.material as THREE.Material).dispose();
+            if (this.pointsMesh.material) {
+                const mat = this.pointsMesh.material as THREE.PointsMaterial;
+                if (mat.map) mat.map.dispose();
+                mat.dispose();
+            }
             this.pointsMesh = null;
         }
     }
