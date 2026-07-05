@@ -413,19 +413,39 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
                             </button>
 
                             {settingsOpen && (
-                                <div className="absolute top-full left-0 mt-2 w-64 bg-zinc-950/90 backdrop-blur-xl border border-zinc-700/50 p-4 rounded-xl shadow-2xl flex flex-col gap-4 text-xs font-mono text-zinc-300">
-                                    <div className="flex flex-col gap-1.5">
+                                <div className="absolute top-full left-0 mt-2 w-72 bg-zinc-950/90 backdrop-blur-xl border border-zinc-700/50 p-4 rounded-xl shadow-2xl flex flex-col gap-5 text-xs font-mono text-zinc-300">
+                                    <div className="flex flex-col gap-2">
                                         <label className="text-zinc-500 font-semibold uppercase tracking-wider text-[10px]">Scene Preset</label>
-                                        <select 
-                                            value={preset} 
-                                            onChange={(e) => setPreset(e.target.value as any)} 
-                                            className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1.5 text-zinc-200 outline-none w-full"
-                                        >
-                                            <option value="cinematic">✨ Cinematic</option>
-                                            <option value="bright">☀️ Bright</option>
-                                            <option value="high_contrast">📊 High Contrast</option>
-                                            <option value="dark">🌑 Dark</option>
-                                        </select>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button 
+                                                onClick={() => setPreset("cinematic")} 
+                                                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition ${preset === "cinematic" ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-400" : "bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200"}`}
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/></svg>
+                                                Cinematic
+                                            </button>
+                                            <button 
+                                                onClick={() => setPreset("bright")} 
+                                                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition ${preset === "bright" ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-400" : "bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200"}`}
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M6.34 17.66l-1.41 1.41"/><path d="M19.07 4.93l-1.41 1.41"/></svg>
+                                                Bright
+                                            </button>
+                                            <button 
+                                                onClick={() => setPreset("high_contrast")} 
+                                                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition ${preset === "high_contrast" ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-400" : "bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200"}`}
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0 0 20z"/></svg>
+                                                Contrast
+                                            </button>
+                                            <button 
+                                                onClick={() => setPreset("dark")} 
+                                                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition ${preset === "dark" ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-400" : "bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200"}`}
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                                                Dark
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="flex flex-col gap-1.5">
