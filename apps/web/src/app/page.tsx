@@ -14,6 +14,33 @@ import ModelTrainingTab from "../components/dataset/ModelTrainingTab";
 import MLSpaceTab from "../components/dataset/MLSpaceTab";
 import { useSearchParams } from "next/navigation";
 
+// Tab SVG Icons
+const OverviewIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+);
+const VizIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+);
+const PipelineIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3h7v4H3zM14 3h7v4h-7zM3 17h7v4H3zM14 17h7v4h-7z"/><line x1="10" y1="5" x2="14" y2="5"/><line x1="10" y1="19" x2="14" y2="19"/><line x1="12" y1="9" x2="12" y2="17"/>
+    </svg>
+);
+const TrainIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+    </svg>
+);
+const SpaceIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>
+    </svg>
+);
+
 function ProfilePageContent() {
     type PageView = "upload" | "loading" | "profile";
     const [view, setView] = useState<PageView>("upload");
@@ -94,25 +121,86 @@ function ProfilePageContent() {
     return (
         <main className="min-h-screen bg-zinc-950 text-zinc-100">
             <div className="mx-auto max-w-6xl px-6 py-10 space-y-8">
-                {/* Upload Section */}
+                {/* Hero Landing Section */}
                 {view === "upload" && (
-                    <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                        <h2 className="text-2xl font-semibold">Upload Dataset</h2>
-                        <p className="mt-1 text-sm text-zinc-400">
-                            Upload a CSV or XLSX file to profile and explore your dataset.
-                        </p>
-                        <div className="mt-6">
+                    <div className="space-y-10">
+                        {/* Hero Header */}
+                        <div className="text-center space-y-5 pt-8">
+                            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 text-emerald-400 text-xs font-semibold uppercase tracking-widest">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                Open Source · No Sign-in Required
+                            </div>
+                            <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
+                                <span className="text-zinc-100">ML </span>
+                                <span style={{ background: "linear-gradient(135deg, #10b981 0%, #06b6d4 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Playground</span>
+                            </h1>
+                            <p className="text-lg text-zinc-400 max-w-xl mx-auto leading-relaxed">
+                                Upload a dataset. Profile it. Build a preprocessing pipeline. Train ML models. Explore predictions in an interactive 3D space.
+                            </p>
+                        </div>
+
+                        {/* Feature Highlights */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {[
+                                {
+                                    icon: (
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                                        </svg>
+                                    ),
+                                    title: "Upload & Profile",
+                                    desc: "Auto-detect column types, missing values, distributions and outliers instantly."
+                                },
+                                {
+                                    icon: (
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                                        </svg>
+                                    ),
+                                    title: "Train ML Models",
+                                    desc: "Random Forest, XGBoost, LightGBM, SVM, Logistic Regression and more — async background training."
+                                },
+                                {
+                                    icon: (
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/>
+                                            <line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/>
+                                        </svg>
+                                    ),
+                                    title: "3D ML Space",
+                                    desc: "Explore your dataset and model predictions in a fully interactive Three.js 3D universe."
+                                }
+                            ].map((feat, i) => (
+                                <div key={i} className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-3 hover:border-zinc-700 transition">
+                                    <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                                        {feat.icon}
+                                    </div>
+                                    <h3 className="font-semibold text-zinc-100">{feat.title}</h3>
+                                    <p className="text-xs text-zinc-400 leading-relaxed">{feat.desc}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Upload Zone */}
+                        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8">
+                            <div className="mb-5">
+                                <h2 className="text-xl font-bold text-zinc-100">Upload Your Dataset</h2>
+                                <p className="mt-1 text-sm text-zinc-400">Supports CSV and XLSX. Your data stays local — nothing is sent to third parties.</p>
+                            </div>
                             <UploadZone onUploadSuccess={handleUploadSuccess} />
                         </div>
-                    </section>
+                    </div>
                 )}
 
                 {view === "loading" && (
-                    <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                        <h2 className="text-2xl font-semibold">Analyzing Dataset</h2>
-                        <p className="mt-1 text-sm text-zinc-400">
-                            Profiling in progress. This may take a few seconds.
-                        </p>
+                    <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-10 flex flex-col items-center gap-4 min-h-[200px] justify-center">
+                        <div className="relative">
+                            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-emerald-500"></div>
+                        </div>
+                        <div className="text-center">
+                            <h2 className="text-base font-semibold text-zinc-200">Analyzing Dataset</h2>
+                            <p className="mt-1 text-sm text-zinc-400">Profiling in progress. This may take a few seconds.</p>
+                        </div>
                     </section>
                 )}
 
@@ -164,53 +252,28 @@ function ProfilePageContent() {
                             </div>
                         </div>
 
-                        {/* Unified Top Navigation Journey */}
-                        <div className="flex border-b border-zinc-800">
-                            <button
-                                onClick={() => setActiveTab("overview")}
-                                className={`px-6 py-3 text-sm font-semibold border-b-2 transition ${activeTab === "overview"
-                                    ? "border-emerald-500 text-emerald-400"
-                                    : "border-transparent text-zinc-400 hover:text-zinc-200"
+                        {/* Tab Navigation with icons */}
+                        <div className="flex border-b border-zinc-800 overflow-x-auto">
+                            {[
+                                { key: "overview", label: "Overview", Icon: OverviewIcon },
+                                { key: "visualize", label: "Visualizations", Icon: VizIcon },
+                                { key: "pipeline", label: "Pipeline Builder", Icon: PipelineIcon },
+                                { key: "model_train", label: "Train Model", Icon: TrainIcon },
+                                { key: "ml_space", label: "ML Space (3D)", Icon: SpaceIcon },
+                            ].map(({ key, label, Icon }) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setActiveTab(key as any)}
+                                    className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition ${
+                                        activeTab === key
+                                            ? "border-emerald-500 text-emerald-400"
+                                            : "border-transparent text-zinc-400 hover:text-zinc-200"
                                     }`}
-                            >
-                                Overview & Profiling
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("visualize")}
-                                className={`px-6 py-3 text-sm font-semibold border-b-2 transition ${activeTab === "visualize"
-                                    ? "border-emerald-500 text-emerald-400"
-                                    : "border-transparent text-zinc-400 hover:text-zinc-200"
-                                    }`}
-                            >
-                                Interactive Visualizations
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("pipeline")}
-                                className={`px-6 py-3 text-sm font-semibold border-b-2 transition ${activeTab === "pipeline"
-                                    ? "border-emerald-500 text-emerald-400"
-                                    : "border-transparent text-zinc-400 hover:text-zinc-200"
-                                    }`}
-                            >
-                                Pipeline Builder
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("model_train")}
-                                className={`px-6 py-3 text-sm font-semibold border-b-2 transition ${activeTab === "model_train"
-                                    ? "border-emerald-500 text-emerald-400"
-                                    : "border-transparent text-zinc-400 hover:text-zinc-200"
-                                    }`}
-                            >
-                                Train Model
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("ml_space")}
-                                className={`px-6 py-3 text-sm font-semibold border-b-2 transition ${activeTab === "ml_space"
-                                    ? "border-emerald-500 text-emerald-400"
-                                    : "border-transparent text-zinc-400 hover:text-zinc-200"
-                                    }`}
-                            >
-                                ML Space (3D)
-                            </button>
+                                >
+                                    <Icon />
+                                    {label}
+                                </button>
+                            ))}
                         </div>
 
                         {/* Overview Tab */}
