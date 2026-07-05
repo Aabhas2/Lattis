@@ -1,3 +1,4 @@
+import joblib
 import os 
 import joblib 
 import pandas as pd 
@@ -140,3 +141,177 @@ def predict_model(job_id: uuid.UUID, req: PredictionRequest, db: Session = Depen
         }
     except Exception as e: 
         raise HTTPException(status_code=500, detail=f"Predicton error: {str(e)}") 
+
+@router.get("/datasets/{dataset_id}/visualize") 
+def get_dataset_visualization_data(dataset_id: uuid.UUID, db: Session = Depends(get_db)): 
+    # Fetch the dataset record from database 
+    dataset = crud.get_dataset(db, dataset_id) 
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found") 
+
+    # Read dataset file from disk 
+    file_path = dataset.file_path 
+    if not os.path.exists(file_path): 
+        raise HTTPException(status_code=404, detail="Dataset file not found on disk")
+
+    try: 
+        if file_path.endswith(".xlsx"): 
+            df = pd.read_excel(file_path) 
+        else: 
+            df = pd.read_csv(file_path) 
+
+    except Exception as e: 
+        raise HTTPException(status_code=500, detail=f"Failed to read dataset: {str(e)}") 
+
+    # Identify and normalize numerical features between [-10, 10] 
+    numeric_cols = df.select_dtypes(include=["number"]).columns.tolist() 
+
+    df_normalized = df.copy() 
+    for col in numeric_cols: 
+        col_min = df[col].min() 
+        col_max = df[col].max() 
+        if col_max != col_min:
+            # Scale range [col_min, col_max] to [-10.0 to 10.0] 
+            df_normalized[col] = -10.0 + 20.0 * (df[col] - col_min) / (col_max - col_min)
+        else: 
+            df_normalized[col] = 0.0 
+
+        # Fill missing numeric values with 0.0 
+        df_normalized[col] = df_normalized[col].fillna(0.0) 
+
+    # Check if there any completed model training runs for this dataset 
+    jobs = crud.list_model_jobs(db, dataset_id) 
+    completed_jobs = [j for j in jobs if j.status == ModelJobStatus.COMPLETE] 
+
+    active_job = None 
+    target_col = None 
+    if completed_jobs: 
+        active_job = completed_jobs[0] 
+        target_col = active_job.config.get("target_column") 
+
+    # Fallback to auto-detect target column in the dataset if no model is trained yet
+    if not target_col:
+        potential_targets = ["survived", "target", "class", "label", "y", "output"]
+        for col_name in df.columns:
+            if col_name.lower() in potential_targets:
+                target_col = col_name
+                break
+        if not target_col and len(df.columns) > 0:
+            target_col = df.columns[-1] 
+
+    # Build points array 
+    points = [] 
+    for idx, row in df.iterrows(): 
+        raw_vals = {} 
+        coords_vals = {} 
+        for col in numeric_cols: 
+            # Raw values for tooltips 
+            raw_vals[col] = float(row[col]) if not pd.isna(row[col]) else None 
+            coords_vals[col] = float(df_normalized.at[idx,col]) 
+
+        # Color-coding classification/regression target values 
+        target_val = None 
+        if target_col and target_col in df.columns: 
+            val = row[target_col] 
+            target_val = float(val) if not pd.isna(val) else None 
+
+        points.append({
+            "id": idx, 
+            "raw": raw_vals, 
+            "coords": coords_vals, 
+            "target": target_val
+        })
+
+    # Extract model parameters  
+    coefficients = None 
+    intercept = None 
+    feature_importance = [] 
+    tree_data = None 
+
+    if active_job: 
+        model_path = os.path.join("storage", "models", f"{active_job.id}.joblib") 
+        if os.path.exists(model_path): 
+            try: 
+                # Load joblib artifacts 
+                model_data = joblib.load(model_path) 
+                model = model_data.get("model") 
+                features_used = model_data.get("features_used", []) 
+
+                # IF pipeline, retrieve the final estimator step 
+                estimator = model 
+                if hasattr(model, "steps"): 
+                    estimator = model.steps[-1][1] 
+
+                # Extract linear coefficients (planes/boundaries)            
+                if hasattr(estimator, "coef_"): 
+                    coef_val = estimator.coef_ 
+                    # If binary logistic regression, coef_ is shape (1, n_features) 
+                    if len(coef_val.shape) > 1 and coef_val.shape[0] == 1: 
+                        coefficients = coef_val[0].tolist() 
+                    else:
+                        coefficients = coef_val.tolist() 
+
+                if hasattr(estimator, "intercept_"):
+                    intercept_val = estimator.intercept_ 
+                    if hasattr(intercept_val, "tolist"): 
+                        intercept = intercept_val.tolist()
+                    else: 
+                        intercept = float(intercept_val) 
+
+                # Extract feature importances (pillars) 
+                if hasattr(estimator, "feature_importances_"): 
+                    importances = estimator.feature_importances_.tolist() 
+                    feature_importance = [
+                        {"feature": f, "importance": imp}
+                        for f, imp in zip(features_used, importances)
+                    ] 
+
+                # Extract decision tree node structures recursively 
+                from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor 
+                from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor 
+
+                tree_estimator = None 
+                if isinstance(estimator, (DecisionTreeClassifier, DecisionTreeRegressor)): 
+                    tree_estimator = estimator 
+                elif isinstance(estimator, (RandomForestClassifier, RandomForestRegressor)): 
+                    tree_estimator = estimator.estimators_[0]
+
+                if tree_estimator and hasattr(tree_estimator, "tree_"): 
+                    def serialize_scikit_tree(tree, node_id): 
+                        # Leaf check: children_left is -1 
+                        if tree.children_left[node_id] == -1: 
+                            val = tree.value[node_id] 
+                            # Resolve class probabilities array if classification 
+                            if len (val.shape) > 1: 
+                                val = val[0].tolist() 
+                            else: 
+                                val = val.tolist() 
+                            return {
+                                "is_leaf": True, 
+                                "value": val 
+                            }
+
+                        feat_idx = tree.feature[node_id] 
+                        feature_name = features_used[feat_idx] if feat_idx < len(features_used) else f"Feat_{feat_idx}"
+                        return {
+                            "is_leaf": False, 
+                            "feature": feature_name, 
+                            "threshold": float(tree.threshold[node_id]), 
+                            "left": serialize_scikit_tree(tree, tree.children_left[node_id]), 
+                            "right": serialize_scikit_tree(tree, tree.children_right[node_id])
+                        }
+                    tree_data = serialize_scikit_tree(tree_estimator.tree_, 0) 
+
+            except Exception as e: 
+                print(f"Warning: Failed to parse visual parameters: {e}") 
+
+    return {
+        "points": points, 
+        "target_column": target_col, 
+        "coefficients": coefficients, 
+        "intercept": intercept, 
+        "feature_importance": feature_importance, 
+        "tree": tree_data
+    }    
+                    
+                
