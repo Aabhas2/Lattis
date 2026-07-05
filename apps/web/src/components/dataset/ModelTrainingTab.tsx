@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { trainModel, getModelJobStatus, runPrediction, getDatasetModels } from "../../lib/api";
 import { ColumnProfile, NumericStats, CategoricalStats } from "../../lib/types";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Trophy, Medal } from "lucide-react";
 
 interface ModelTrainingTabProps {
     datasetId: string;
@@ -59,6 +60,24 @@ const ALGORITHM_INFO: Record<string, { title: string; desc: string; pros: string
         desc: "Finds the optimal hyperplane that maximizes class separation in high dimensions.",
         pros: ["Effective in high-dimensional spaces", "Versatile due to kernel trick options"],
         cons: ["Extremely slow on large datasets", "Sensitive to scaling and noise", "Does not provide probability estimates natively"]
+    },
+    decision_tree: {
+        title: "Decision Tree",
+        desc: "Splits data into branches based on feature thresholds to make predictions.",
+        pros: ["Highly interpretable", "Requires little data preprocessing", "Non-linear relationships"],
+        cons: ["Prone to overfitting", "Unstable to small data variations"]
+    },
+    knn: {
+        title: "K-Nearest Neighbors",
+        desc: "Predicts based on the majority class or average of the K closest training examples.",
+        pros: ["Simple and intuitive", "No training phase", "Naturally handles multi-class"],
+        cons: ["Slow inference on large datasets", "Sensitive to irrelevant features and scaling"]
+    },
+    kmeans: {
+        title: "K-Means Clustering",
+        desc: "Unsupervised algorithm that groups data into K distinct clusters based on feature similarity.",
+        pros: ["Fast and scalable", "Easy to understand", "Great for discovering hidden patterns"],
+        cons: ["Requires choosing K in advance", "Sensitive to outliers and initial centroid placement"]
     }
 };
 
@@ -94,16 +113,24 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
     useEffect(() => {
         setIsMounted(true);
         
-        const cachedTarget = sessionStorage.getItem("ml_playground_target_col");
-        const cachedTask = sessionStorage.getItem("ml_playground_task_type") as any;
-        const cachedAlgo = sessionStorage.getItem("ml_playground_algorithm");
-        const cachedJobId = sessionStorage.getItem("ml_playground_job_id");
-        const cachedStatus = sessionStorage.getItem("ml_playground_job_status") as any;
-        const cachedResults = sessionStorage.getItem("ml_playground_results");
-        const cachedSplit = sessionStorage.getItem("ml_playground_split");
-        const cachedParams = sessionStorage.getItem("ml_playground_parameters");
+        // Use a dataset-specific prefix for caching to avoid cross-dataset contamination
+        const prefix = `mlp_${datasetId}_`;
+        const cachedTarget = sessionStorage.getItem(`${prefix}target_col`);
+        const cachedTask = sessionStorage.getItem(`${prefix}task_type`) as any;
+        const cachedAlgo = sessionStorage.getItem(`${prefix}algorithm`);
+        const cachedJobId = sessionStorage.getItem(`${prefix}job_id`);
+        const cachedStatus = sessionStorage.getItem(`${prefix}job_status`) as any;
+        const cachedResults = sessionStorage.getItem(`${prefix}results`);
+        const cachedSplit = sessionStorage.getItem(`${prefix}split`);
+        const cachedParams = sessionStorage.getItem(`${prefix}parameters`);
 
-        if (cachedTarget) setTargetCol(cachedTarget);
+        // Validate target exists in current columns before restoring
+        if (cachedTarget && columns.some(c => c.name === cachedTarget)) {
+            setTargetCol(cachedTarget);
+        } else if (columns.length > 0) {
+            setTargetCol(columns[0].name);
+        }
+
         if (cachedTask) setTaskType(cachedTask);
         if (cachedAlgo) setAlgorithm(cachedAlgo);
         if (cachedJobId) setJobId(cachedJobId);
@@ -111,23 +138,24 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
         if (cachedResults) setResults(JSON.parse(cachedResults));
         if (cachedSplit) setSplit(parseFloat(cachedSplit) || 0.8);
         if (cachedParams) setParameters(JSON.parse(cachedParams));
-    }, []);
+    }, [datasetId, columns]);
 
     // Sync state changes to sessionStorage for persistence across tab unmounts
     useEffect(() => {
         if (!isMounted) return;
-        sessionStorage.setItem("ml_playground_target_col", targetCol);
-        sessionStorage.setItem("ml_playground_task_type", taskType);
-        sessionStorage.setItem("ml_playground_algorithm", algorithm);
-        sessionStorage.setItem("ml_playground_split", split.toString());
-        sessionStorage.setItem("ml_playground_parameters", JSON.stringify(parameters));
-        if (jobId) sessionStorage.setItem("ml_playground_job_id", jobId);
-        else sessionStorage.removeItem("ml_playground_job_id");
-        if (jobStatus) sessionStorage.setItem("ml_playground_job_status", jobStatus);
-        else sessionStorage.removeItem("ml_playground_job_status");
-        if (results) sessionStorage.setItem("ml_playground_results", JSON.stringify(results));
-        else sessionStorage.removeItem("ml_playground_results");
-    }, [targetCol, taskType, algorithm, split, parameters, jobId, jobStatus, results, isMounted]);
+        const prefix = `mlp_${datasetId}_`;
+        sessionStorage.setItem(`${prefix}target_col`, targetCol);
+        sessionStorage.setItem(`${prefix}task_type`, taskType);
+        sessionStorage.setItem(`${prefix}algorithm`, algorithm);
+        sessionStorage.setItem(`${prefix}split`, split.toString());
+        sessionStorage.setItem(`${prefix}parameters`, JSON.stringify(parameters));
+        if (jobId) sessionStorage.setItem(`${prefix}job_id`, jobId);
+        else sessionStorage.removeItem(`${prefix}job_id`);
+        if (jobStatus) sessionStorage.setItem(`${prefix}job_status`, jobStatus);
+        else sessionStorage.removeItem(`${prefix}job_status`);
+        if (results) sessionStorage.setItem(`${prefix}results`, JSON.stringify(results));
+        else sessionStorage.removeItem(`${prefix}results`);
+    }, [targetCol, taskType, algorithm, split, parameters, jobId, jobStatus, results, isMounted, datasetId]);
 
     const fetchHistory = async () => {
         if (!datasetId) return;
@@ -368,13 +396,18 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                         <select
                             value={targetCol}
                             onChange={(e) => setTargetCol(e.target.value)}
-                            className="w-full rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                            disabled={algorithm === "kmeans"}
+                            className={`w-full rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500 ${algorithm === "kmeans" ? "opacity-50 cursor-not-allowed" : ""}`}
                         >
-                            {columns.map((c) => (
-                                <option key={c.name} value={c.name}>
-                                    {c.name} ({c.dtype})
-                                </option>
-                            ))}
+                            {algorithm === "kmeans" ? (
+                                <option>Not required (Unsupervised)</option>
+                            ) : (
+                                columns.map((c) => (
+                                    <option key={c.name} value={c.name}>
+                                        {c.name} ({c.dtype})
+                                    </option>
+                                ))
+                            )}
                         </select>
                     </div>
 
@@ -407,21 +440,34 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                         >
                             {taskType === "regression" ? (
                                 <>
-                                    <option value="random_forest">Random Forest Regressor</option>
-                                    <option value="gradient_boosting">Gradient Boosting Regressor</option>
-                                    <option value="linear_regression">Linear Regression</option>
-                                    <option value="ridge">Ridge Regression</option>
-                                    <option value="xgboost">XGBoost Regressor</option>
-                                    <option value="lightgbm">LightGBM Regressor</option>
+                                    <optgroup label="Regression">
+                                        <option value="random_forest">Random Forest Regressor</option>
+                                        <option value="gradient_boosting">Gradient Boosting Regressor</option>
+                                        <option value="decision_tree">Decision Tree Regressor</option>
+                                        <option value="linear_regression">Linear Regression</option>
+                                        <option value="ridge">Ridge Regression</option>
+                                        <option value="xgboost">XGBoost Regressor</option>
+                                        <option value="lightgbm">LightGBM Regressor</option>
+                                    </optgroup>
+                                    <optgroup label="Unsupervised">
+                                        <option value="kmeans">K-Means Clustering</option>
+                                    </optgroup>
                                 </>
                             ) : (
                                 <>
-                                    <option value="random_forest">Random Forest Classifier</option>
-                                    <option value="gradient_boosting">Gradient Boosting Classifier</option>
-                                    <option value="logistic_regression">Logistic Regression</option>
-                                    <option value="svm">Support Vector Machine (SVM)</option>
-                                    <option value="xgboost">XGBoost Classifier</option>
-                                    <option value="lightgbm">LightGBM Classifier</option>
+                                    <optgroup label="Classification">
+                                        <option value="random_forest">Random Forest Classifier</option>
+                                        <option value="gradient_boosting">Gradient Boosting Classifier</option>
+                                        <option value="decision_tree">Decision Tree Classifier</option>
+                                        <option value="logistic_regression">Logistic Regression</option>
+                                        <option value="svm">Support Vector Machine (SVM)</option>
+                                        <option value="knn">K-Nearest Neighbors</option>
+                                        <option value="xgboost">XGBoost Classifier</option>
+                                        <option value="lightgbm">LightGBM Classifier</option>
+                                    </optgroup>
+                                    <optgroup label="Unsupervised">
+                                        <option value="kmeans">K-Means Clustering</option>
+                                    </optgroup>
                                 </>
                             )}
                         </select>
@@ -545,6 +591,92 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                             />
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {algorithm === "decision_tree" && (
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs text-zinc-400 font-semibold uppercase">Max Depth</label>
+                                        <select
+                                            value={parameters.max_depth !== null && parameters.max_depth !== undefined ? String(parameters.max_depth) : "None"}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setParameters({ ...parameters, max_depth: val === "None" ? null : parseInt(val) });
+                                            }}
+                                            className="w-full rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                                        >
+                                            <option value="None">None (Unlimited)</option>
+                                            <option value="3">3 (Shallow)</option>
+                                            <option value="5">5</option>
+                                            <option value="10">10</option>
+                                            <option value="20">20 (Deep)</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs text-zinc-400 font-semibold uppercase">Min Samples Split</label>
+                                        <select
+                                            value={String(parameters.min_samples_split ?? 2)}
+                                            onChange={(e) => setParameters({ ...parameters, min_samples_split: parseInt(e.target.value) })}
+                                            className="w-full rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                                        >
+                                            <option value="2">2 (Default)</option>
+                                            <option value="5">5</option>
+                                            <option value="10">10</option>
+                                            <option value="20">20</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                            {algorithm === "knn" && (
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-xs text-zinc-400 font-semibold uppercase">
+                                            <span>N Neighbors (K)</span>
+                                            <span className="font-mono text-emerald-400">{parameters.n_neighbors ?? 5}</span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="1"
+                                            max="50"
+                                            step="1"
+                                            value={parameters.n_neighbors ?? 5}
+                                            onChange={(e) => setParameters({ ...parameters, n_neighbors: parseInt(e.target.value) })}
+                                            className="w-full accent-emerald-500 cursor-pointer h-1.5 rounded bg-zinc-850"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs text-zinc-400 font-semibold uppercase">Weights</label>
+                                        <select
+                                            value={String(parameters.weights ?? "uniform")}
+                                            onChange={(e) => setParameters({ ...parameters, weights: e.target.value })}
+                                            className="w-full rounded-lg border border-zinc-750 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                                        >
+                                            <option value="uniform">Uniform</option>
+                                            <option value="distance">Distance (Inverse)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                            {algorithm === "kmeans" && (
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-xs text-zinc-400 font-semibold uppercase">
+                                            <span>N Clusters (K)</span>
+                                            <span className="font-mono text-emerald-400">{parameters.n_clusters ?? 3}</span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="2"
+                                            max="20"
+                                            step="1"
+                                            value={parameters.n_clusters ?? 3}
+                                            onChange={(e) => setParameters({ ...parameters, n_clusters: parseInt(e.target.value) })}
+                                            className="w-full accent-emerald-500 cursor-pointer h-1.5 rounded bg-zinc-850"
+                                        />
+                                    </div>
                                 </div>
                             )}
 
@@ -1100,7 +1232,12 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                         })
                                         .map((modelRun, idx) => {
                                             const isCurrent = jobId === modelRun.job_id;
-                                            const rankMedal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`;
+                                            
+                                            let rankMedal = <span className="text-zinc-500">{idx + 1}</span>;
+                                            if (idx === 0) rankMedal = <Trophy className="w-4 h-4 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]" />;
+                                            else if (idx === 1) rankMedal = <Medal className="w-4 h-4 text-zinc-300 drop-shadow-[0_0_6px_rgba(212,212,216,0.5)]" />;
+                                            else if (idx === 2) rankMedal = <Medal className="w-4 h-4 text-amber-700 drop-shadow-[0_0_4px_rgba(180,83,9,0.5)]" />;
+
                                             let primaryMetric = "N/A";
                                             let secondaryMetric = "N/A";
                                             if (taskType === "classification") {
@@ -1125,7 +1262,7 @@ export default function ModelTrainingTab({ datasetId, columns, filename }: Model
                                                     key={modelRun.job_id}
                                                     className={`transition-colors hover:bg-zinc-850/20 ${isCurrent ? "bg-emerald-950/10" : ""}`}
                                                 >
-                                                    <td className="py-3 px-3 font-semibold text-zinc-350 text-sm">
+                                                    <td className="py-3 px-3 font-semibold text-zinc-350 text-sm flex items-center h-full min-h-[48px]">
                                                         {rankMedal}
                                                     </td>
                                                     <td className="py-3 px-3">

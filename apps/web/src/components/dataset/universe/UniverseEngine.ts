@@ -65,16 +65,28 @@ export class UniverseEngine {
     private animate = () => {
         this.animationFrameId = requestAnimationFrame(this.animate);
 
+        const time = performance.now() * 0.001; // seconds
+
         this.cameraManager.update();
-        this.datasetRenderer.update();
+        this.sceneManager.update(time);
+        this.datasetRenderer.update(time);
         this.modelSurfaceRenderer.update();
         this.predictionAnimator.update();
+        this.axisLabeler?.update(this.cameraManager.camera);
 
         this.hoverManager.update({
             pointsMesh: this.datasetRenderer.getPointsMesh(),
             pillarsGroup: this.modelSurfaceRenderer.getPillarsGroup(),
             treeGroup: this.treeRenderer.getTreeGroup()
         });
+
+        // Sync hover highlight
+        const hovered = this.hoverManager.getCurrentHoveredItem();
+        if (hovered && hovered.type === "point") {
+            this.datasetRenderer.setHoveredIndex(hovered.index);
+        } else {
+            this.datasetRenderer.setHoveredIndex(null);
+        }
 
         // Call central webgl renderer to draw the scene 
         this.sceneManager.renderer.render(
@@ -90,7 +102,12 @@ export class UniverseEngine {
         this.zAxis = zAxis;
         this.datasetRenderer.updateAxes(xAxis, yAxis, zAxis);
         this.axisLabeler?.updateLabels(xAxis, yAxis, zAxis);
+    }
 
+    public toggleLabels(show: boolean) {
+        if (this.axisLabeler) {
+            this.axisLabeler.setVisible(show);
+        }
     }
 
     public loadData(data: VisualizationData) {
@@ -104,10 +121,44 @@ export class UniverseEngine {
         this.treeRenderer.setMode(mode);
     }
 
+    private onPredictionLandedCallback: ((neighbors: any[]) => void) | null = null;
+
+    public onPredictionLanded(cb: (neighbors: any[]) => void) {
+        this.onPredictionLandedCallback = cb;
+    }
+
     public triggerPrediction(inputs: Record<string, number>, result: any) {
         const normalizedCoords: Record<string, number> = {};
         Object.keys(inputs).forEach(colName => {
             normalizedCoords[colName] = normalizeValue(inputs[colName], colName, this.columns);
+        });
+
+        const targetX = normalizedCoords[this.xAxis] ?? 0;
+        const targetY = normalizedCoords[this.yAxis] ?? -10;
+        const targetZ = normalizedCoords[this.zAxis] ?? 0;
+
+        this.predictionAnimator.onLanded(() => {
+            if (this.onPredictionLandedCallback) {
+                // Compute nearest neighbors based on normalized Euclidean distance
+                const pts = this.datasetRenderer.getPointsMesh();
+                if (pts) {
+                    const positions = pts.geometry.attributes.position.array as Float32Array;
+                    const distances = [];
+                    for (let i = 0; i < positions.length / 3; i++) {
+                        const dx = positions[i * 3] - targetX;
+                        const dy = positions[i * 3 + 1] - targetY;
+                        const dz = positions[i * 3 + 2] - targetZ;
+                        const dist = dx * dx + dy * dy + dz * dz;
+                        distances.push({ index: i, dist });
+                    }
+                    
+                    distances.sort((a, b) => a.dist - b.dist);
+                    const top3 = distances.slice(0, 3).map(d => d.index);
+                    this.onPredictionLandedCallback(top3);
+                } else {
+                    this.onPredictionLandedCallback([]);
+                }
+            }
         });
 
         this.predictionAnimator.trigger(
@@ -120,8 +171,30 @@ export class UniverseEngine {
         );
     }
 
+    public flyToPoint(index: number) {
+        const pts = this.datasetRenderer.getPointsMesh();
+        if (!pts) return;
+        const positions = pts.geometry.attributes.position.array as Float32Array;
+        const x = positions[index * 3];
+        const y = positions[index * 3 + 1];
+        const z = positions[index * 3 + 2];
+        const target = new THREE.Vector3(x, y, z);
+        this.cameraManager.focusOnPoint(target, 8);
+    }
+
+    public tweenCameraTo(preset: "front" | "top" | "side" | "reset") {
+        if (preset === "front") this.cameraManager.tweenToFront();
+        else if (preset === "top") this.cameraManager.tweenToTop();
+        else if (preset === "side") this.cameraManager.tweenToSide();
+        else this.cameraManager.tweenToReset();
+    }
+
     public onHover(callback: (payload: any | null) => void) {
         this.hoverManager.onHover(callback);
+    }
+
+    public onClick(callback: (payload: any | null) => void) {
+        this.hoverManager.onClick(callback);
     }
 
     public destroy() {

@@ -19,8 +19,8 @@ export class ModelSurfaceRenderer {
         this.clearPillars();
 
         // Build Decision Hyperplane if linear coefficients are present 
-        if (data.coefficients && data.coefficients.length >= 2 && data.intercept !== null) {
-            this.buildSurface(data.coefficients, data.intercept, xAxis, yAxis, zAxis);
+        if (data.coefficients && Object.keys(data.coefficients).length > 0 && data.intercept !== null) {
+            this.buildSurface(data.coefficients, data.intercept, xAxis, yAxis, zAxis, data.scale_params, data.task_type, data.target_column);
         }
         // Build circular Feature Importance columns if present 
         if (data.feature_importance && data.feature_importance.length > 0) {
@@ -29,55 +29,99 @@ export class ModelSurfaceRenderer {
         this.applyVisibility();
     }
 
-    private buildSurface(coefs: number[], intercept: number, xAxis: string, yAxis: string, zAxis: string) {
-        // Construct horizontal plane dimensions 
+    private buildSurface(coefs: Record<string, number>, intercept: number, xAxis: string, yAxis: string, zAxis: string, scaleParams: Record<string, {min: number, max: number, mean: number}>, taskType: string, targetCol: string | null) {
         const size = 30;
-        const geometry = new THREE.PlaneGeometry(size, size, 15, 15);
-        geometry.rotateX(-Math.PI / 2);
+        
+        // Helper to get scaling constants for a column: X_orig = m * X_coord + b
+        const getScaleConstants = (col: string) => {
+            const p = scaleParams[col];
+            if (!p || p.max === p.min) return { m: 0, b: p ? p.mean : 0 };
+            const m = (p.max - p.min) / 20.0;
+            const b = p.min + 10.0 * m;
+            return { m, b };
+        };
 
-        const pos = geometry.attributes.position;
-
-        // Default coefficients 
-        let m1 = 0;
-        let m2 = 0;
-        let c = intercept;
-
-        if (coefs.length >= 3) {
-            const wX = coefs[0];
-            const wY = coefs[1] !== 0 ? coefs[1] : 1;
-            const wZ = coefs[2];
-
-            m1 = -wX / wY;
-            m2 = -wZ / wY;
-            c = -intercept / wY;
-        } else if (coefs.length === 2) {
-            m1 = coefs[0];
-            m2 = coefs[1];
-            c = intercept;
+        // 1. Calculate base intercept for unseen features held at their mean
+        let baseIntercept = intercept;
+        for (const [feat, weight] of Object.entries(coefs)) {
+            if (feat !== xAxis && feat !== yAxis && feat !== zAxis) {
+                const p = scaleParams[feat];
+                const mean = p ? p.mean : 0;
+                baseIntercept += weight * mean;
+            }
         }
 
-        // Clip slopes to keep plane heights bounded inside the visualizer bounding box 
-        m1 = Math.max(-2, Math.min(2, m1));
-        m2 = Math.max(-2, Math.min(2, m2));
-        c = Math.max(-10, Math.min(10, c));
+        // 2. Set up unified equation: A * X_orig + B * Y_orig + C * Z_orig + D = 0
+        let A = coefs[xAxis] || 0;
+        let B = coefs[yAxis] || 0;
+        let C = coefs[zAxis] || 0;
+        let D = baseIntercept;
 
-        // Adjust each version coordinate height Y based on plane slope formulas 
-        for (let i = 0; i < pos.count; i++) {
-            const x = pos.getX(i);
-            const z = pos.getZ(i);
-            const y = m1 * x + m2 * z + c;
-            pos.setY(i, y);
+        if (taskType === "Regression") {
+            if (xAxis === targetCol) A = -1;
+            if (yAxis === targetCol) B = -1;
+            if (zAxis === targetCol) C = -1;
+        }
+
+        // 3. Map to coordinate space: A_c * x_c + B_c * y_c + C_c * z_c + D_c = 0
+        const sx = getScaleConstants(xAxis);
+        const sy = getScaleConstants(yAxis);
+        const sz = getScaleConstants(zAxis);
+
+        const Ac = A * sx.m;
+        const Bc = B * sy.m;
+        const Cc = C * sz.m;
+        const Dc = A * sx.b + B * sy.b + C * sz.b + D;
+
+        // 4. Orient the PlaneGeometry to avoid vertical stretching (infinity slopes)
+        let geometry = new THREE.PlaneGeometry(size, size, 15, 15);
+        const pos = geometry.attributes.position;
+        
+        const absA = Math.abs(Ac);
+        const absB = Math.abs(Bc);
+        const absC = Math.abs(Cc);
+
+        if (absB >= absA && absB >= absC && absB > 1e-6) {
+            // Y is dependent (Horizontal Plane)
+            geometry.rotateX(-Math.PI / 2);
+            for (let i = 0; i < pos.count; i++) {
+                const x = pos.getX(i);
+                const z = pos.getZ(i);
+                const y = (-Ac * x - Cc * z - Dc) / Bc;
+                pos.setY(i, y);
+            }
+        } else if (absA >= absB && absA >= absC && absA > 1e-6) {
+            // X is dependent (Vertical Y-Z Plane)
+            geometry.rotateY(Math.PI / 2);
+            for (let i = 0; i < pos.count; i++) {
+                const y = pos.getY(i);
+                const z = pos.getZ(i);
+                const x = (-Bc * y - Cc * z - Dc) / Ac;
+                pos.setX(i, x);
+            }
+        } else if (absC > 1e-6) {
+            // Z is dependent (Vertical X-Y Plane)
+            // No rotation needed for X-Y plane
+            for (let i = 0; i < pos.count; i++) {
+                const x = pos.getX(i);
+                const y = pos.getY(i);
+                const z = (-Ac * x - Bc * y - Dc) / Cc;
+                pos.setZ(i, z);
+            }
         }
 
         geometry.computeVertexNormals();
 
         const material = new THREE.MeshStandardMaterial({
             color: new THREE.Color(COLORS.positive),
+            emissive: new THREE.Color(COLORS.positive),
+            emissiveIntensity: 0.4,
             transparent: true,
-            opacity: 0.3,
+            opacity: 0.25,
             side: THREE.DoubleSide,
             wireframe: true,
-            depthWrite: false
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
         });
 
         this.surfaceMesh = new THREE.Mesh(geometry, material);

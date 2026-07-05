@@ -109,7 +109,7 @@ class PipelineService:
         df_copy = df.copy()  
         
         if target_type == "int":  
-            df_copy[column] = pd.to_numeric(df_copy[column], errors="raise").astype("int64")
+            df_copy[column] = pd.to_numeric(df_copy[column], errors="raise").astype("Int64")
         
         elif target_type == "float": 
             df_copy[column] = pd.to_numeric(df_copy[column], errors="raise").astype("float64") 
@@ -175,12 +175,13 @@ class PipelineService:
         df_copy = df.copy()  
 
         # OrdinalEncoder encodes categories to integers (0,1,2,....) 
+        # Missing values (NaN) will be kept as np.nan
         encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1) 
         df_copy[existing_cols] = encoder.fit_transform(df_copy[existing_cols]) 
 
-        # Convert output floats to clean integers 
+        # Convert output floats to clean nullable integers (Int64) 
         for col in existing_cols: 
-            df_copy[col] = df_copy[col].astype(int) 
+            df_copy[col] = df_copy[col].astype("Int64") 
 
         return df_copy 
 

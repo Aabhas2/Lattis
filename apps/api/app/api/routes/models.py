@@ -2,7 +2,9 @@ import joblib
 import os 
 import joblib 
 import pandas as pd 
+import numpy as np
 from pydantic import BaseModel
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException 
 from sqlalchemy.orm import Session 
 import uuid 
@@ -143,7 +145,7 @@ def predict_model(job_id: uuid.UUID, req: PredictionRequest, db: Session = Depen
         raise HTTPException(status_code=500, detail=f"Predicton error: {str(e)}") 
 
 @router.get("/datasets/{dataset_id}/visualize") 
-def get_dataset_visualization_data(dataset_id: uuid.UUID, db: Session = Depends(get_db)): 
+def get_dataset_visualization_data(dataset_id: uuid.UUID, model_id: Optional[uuid.UUID] = None, db: Session = Depends(get_db)): 
     # Fetch the dataset record from database 
     dataset = crud.get_dataset(db, dataset_id) 
     if not dataset:
@@ -167,9 +169,19 @@ def get_dataset_visualization_data(dataset_id: uuid.UUID, db: Session = Depends(
     numeric_cols = df.select_dtypes(include=["number"]).columns.tolist() 
 
     df_normalized = df.copy() 
+    scale_params = {}
     for col in numeric_cols: 
         col_min = df[col].min() 
         col_max = df[col].max() 
+        col_mean = df[col].mean()
+        
+        # Save exact values to scale_params (handle NaN just in case)
+        scale_params[col] = {
+            "min": float(col_min) if not pd.isna(col_min) else 0.0,
+            "max": float(col_max) if not pd.isna(col_max) else 0.0,
+            "mean": float(col_mean) if not pd.isna(col_mean) else 0.0
+        }
+        
         if col_max != col_min:
             # Scale range [col_min, col_max] to [-10.0 to 10.0] 
             df_normalized[col] = -10.0 + 20.0 * (df[col] - col_min) / (col_max - col_min)
@@ -185,8 +197,12 @@ def get_dataset_visualization_data(dataset_id: uuid.UUID, db: Session = Depends(
 
     active_job = None 
     target_col = None 
+    
     if completed_jobs: 
-        active_job = completed_jobs[0] 
+        if model_id:
+            active_job = next((j for j in completed_jobs if j.id == model_id), completed_jobs[0])
+        else:
+            active_job = completed_jobs[0] 
         target_col = active_job.config.get("target_column") 
 
     # Fallback to auto-detect target column in the dataset if no model is trained yet
@@ -198,6 +214,13 @@ def get_dataset_visualization_data(dataset_id: uuid.UUID, db: Session = Depends(
                 break
         if not target_col and len(df.columns) > 0:
             target_col = df.columns[-1] 
+
+    # Create a mapping for string targets to numbers
+    target_mapping = {}
+    if target_col and target_col in df.columns:
+        if df[target_col].dtype == object or df[target_col].dtype.name == 'category':
+            unique_vals = df[target_col].dropna().unique()
+            target_mapping = {val: float(idx) for idx, val in enumerate(unique_vals)}
 
     # Build points array 
     points = [] 
@@ -213,7 +236,17 @@ def get_dataset_visualization_data(dataset_id: uuid.UUID, db: Session = Depends(
         target_val = None 
         if target_col and target_col in df.columns: 
             val = row[target_col] 
-            target_val = float(val) if not pd.isna(val) else None 
+            if pd.isna(val):
+                target_val = None
+            elif isinstance(val, (int, float, bool)):
+                target_val = float(val)
+            elif val in target_mapping:
+                target_val = target_mapping[val]
+            else:
+                try:
+                    target_val = float(val)
+                except ValueError:
+                    target_val = 0.0
 
         points.append({
             "id": idx, 
@@ -247,9 +280,15 @@ def get_dataset_visualization_data(dataset_id: uuid.UUID, db: Session = Depends(
                     coef_val = estimator.coef_ 
                     # If binary logistic regression, coef_ is shape (1, n_features) 
                     if len(coef_val.shape) > 1 and coef_val.shape[0] == 1: 
-                        coefficients = coef_val[0].tolist() 
+                        raw_coefs = coef_val[0].tolist() 
                     else:
-                        coefficients = coef_val.tolist() 
+                        # For multi-class or multi-target, just grab the first one for visualization
+                        raw_coefs = coef_val[0].tolist() if len(coef_val.shape) > 1 else coef_val.tolist()
+                    
+                    coefficients = {}
+                    for idx, weight in enumerate(raw_coefs):
+                        feature_name = features_used[idx] if idx < len(features_used) else f"Feat_{idx}"
+                        coefficients[feature_name] = weight
 
                 if hasattr(estimator, "intercept_"):
                     intercept_val = estimator.intercept_ 
@@ -265,6 +304,22 @@ def get_dataset_visualization_data(dataset_id: uuid.UUID, db: Session = Depends(
                         {"feature": f, "importance": imp}
                         for f, imp in zip(features_used, importances)
                     ] 
+                elif hasattr(estimator, "coef_"):
+                    # Use absolute value of coefficients as importance for linear models
+                    coef_val = estimator.coef_
+                    if len(coef_val.shape) > 1:
+                        importances = np.abs(coef_val[0]).tolist()
+                    else:
+                        importances = np.abs(coef_val).tolist()
+                    
+                    # Normalize importances so they scale nicely like tree importances (0 to 1)
+                    max_imp = max(importances) if importances else 1.0
+                    if max_imp == 0: max_imp = 1.0
+                    
+                    feature_importance = [
+                        {"feature": f, "importance": imp / max_imp}
+                        for f, imp in zip(features_used, importances)
+                    ]
 
                 # Extract decision tree node structures recursively 
                 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor 
@@ -305,13 +360,22 @@ def get_dataset_visualization_data(dataset_id: uuid.UUID, db: Session = Depends(
             except Exception as e: 
                 print(f"Warning: Failed to parse visual parameters: {e}") 
 
+    # Determine task type
+    task_type = "Classification"
+    if active_job:
+        algo = active_job.config.get("algorithm", "").lower()
+        if "regress" in algo and "logistic" not in algo:
+            task_type = "Regression"
+
     return {
         "points": points, 
         "target_column": target_col, 
         "coefficients": coefficients, 
         "intercept": intercept, 
         "feature_importance": feature_importance, 
-        "tree": tree_data
+        "tree": tree_data,
+        "scale_params": scale_params,
+        "task_type": task_type
     }    
                     
                 

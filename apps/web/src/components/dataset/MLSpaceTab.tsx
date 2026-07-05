@@ -32,6 +32,16 @@ const PillarsIcon = () => (
         <rect x="3" y="12" width="4" height="9" rx="1" /><rect x="10" y="7" width="4" height="14" rx="1" /><rect x="17" y="3" width="4" height="18" rx="1" />
     </svg>
 );
+const ClustersIcon = () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="6" cy="6" r="3" /><circle cx="18" cy="6" r="3" /><circle cx="12" cy="18" r="3" />
+    </svg>
+);
+const PCAIcon = () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3v18h18" /><circle cx="9" cy="15" r="2" /><circle cx="15" cy="9" r="2" /><path d="M9 15l6-6" strokeDasharray="2 3" opacity="0.7" />
+    </svg>
+);
 const ExpandIcon = () => (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
@@ -74,9 +84,14 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
     const [predLoading, setPredLoading] = useState(false);
     const [predResult, setPredResult] = useState<any | null>(null);
     const [predError, setPredError] = useState<string | null>(null);
+    const [predictionNeighbors, setPredictionNeighbors] = useState<number[] | null>(null);
+    const [isProbeFlying, setIsProbeFlying] = useState(false);
     const [hoveredItem, setHoveredItem] = useState<any | null>(null);
+    const [selectedPoint, setSelectedPoint] = useState<any | null>(null);
+    const [datasetInfo, setDatasetInfo] = useState<{ total: number; target: string | null; task_type: string | null } | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showLabels, setShowLabels] = useState(true);
 
     // Read active model from localStorage on mount and listen for changes
     useEffect(() => {
@@ -151,14 +166,42 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
                 setHoveredItem(item);
             });
 
+            engine.onClick((item: any) => {
+                setSelectedPoint(item);
+            });
+
+            engine.onPredictionLanded((neighbors: number[]) => {
+                setPredictionNeighbors(neighbors);
+                setIsProbeFlying(false);
+            });
+
             const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
-            fetch(`${BASE_URL}/models/datasets/${datasetId}/visualize`)
+            const url = new URL(`${BASE_URL}/models/datasets/${datasetId}/visualize`);
+            if (activeModelId) {
+                url.searchParams.append("model_id", activeModelId);
+            }
+
+            fetch(url.toString())
                 .then(res => {
                     if (!res.ok) throw new Error("Failed to fetch visualization coordinates");
                     return res.json();
                 })
                 .then(data => {
                     engine.loadData(data);
+                    
+                    // Infer dataset info
+                    const total = data.points?.length || 0;
+                    const targetCol = data.target_column;
+                    
+                    const algo = localStorage.getItem("active_model_algorithm")?.toLowerCase() || "";
+                    let task_type = "Classification";
+                    
+                    // Logistic regression is classification, other regressors are regression
+                    if (algo.includes("regress") && !algo.includes("logistic")) {
+                        task_type = "Regression";
+                    }
+                    
+                    setDatasetInfo({ total, target: targetCol, task_type });
                 })
                 .catch(err => console.error("Failed to load visual coordinates:", err));
         });
@@ -170,7 +213,7 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
                 engineRef.current = null;
             }
         };
-    }, [datasetId]);
+    }, [datasetId, activeModelId]);
 
     // 2. Propagate axis coordinate changes to the Three.js Engine
     useEffect(() => {
@@ -185,6 +228,13 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
             engineRef.current.setMode(activeMode);
         }
     }, [activeMode]);
+
+    // 4. Toggle labels
+    useEffect(() => {
+        if (engineRef.current) {
+            engineRef.current.toggleLabels(showLabels);
+        }
+    }, [showLabels]);
 
     // Trigger local feature inputs when model parameters are loaded
     useEffect(() => {
@@ -202,6 +252,7 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
         setPredLoading(true);
         setPredError(null);
         setPredResult(null);
+        setPredictionNeighbors(null);
 
         // Find the active trained model ID from localStorage or pass an active ID
         const activeJobId = localStorage.getItem("active_model_job_id");
@@ -214,6 +265,7 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
         try {
             const res = await runPrediction(activeJobId, predInputs);
             setPredResult(res);
+            setIsProbeFlying(true);
 
             // Trigger the cinematic particle flying animation in Three.js!
             if (engineRef.current) {
@@ -224,7 +276,34 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
         } finally {
             setPredLoading(false);
         }
-    };    return (
+    };
+
+    const handleAutoTour = async () => {
+        if (!engineRef.current) return;
+        
+        // 1. Reset Camera & Mode
+        setActiveMode("dataset");
+        engineRef.current.tweenCameraTo("reset");
+        
+        // 2. Overview Top
+        setTimeout(() => {
+            engineRef.current?.tweenCameraTo("top");
+        }, 1500);
+
+        // 3. Side profile & Boundary
+        setTimeout(() => {
+            engineRef.current?.tweenCameraTo("side");
+            setActiveMode("boundary");
+        }, 3500);
+
+        // 4. Trigger prediction probe with current inputs
+        setTimeout(() => {
+            const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+            handleTriggerPrediction(fakeEvent);
+        }, 6000);
+    };
+
+    return (
         <div className="space-y-6">
             {/* Top Toolbar controls */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800">
@@ -233,6 +312,8 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
                         { key: "dataset", label: "Dataset Space", Icon: DatasetIcon },
                         { key: "boundary", label: "Decision Boundary", Icon: BoundaryIcon },
                         { key: "tree", label: "Decision Tree", Icon: TreeIcon },
+                        { key: "clusters", label: "Clusters", Icon: ClustersIcon },
+                        { key: "pca", label: "PCA Projection", Icon: PCAIcon },
                         { key: "importance", label: "Feature Pillars", Icon: PillarsIcon },
                     ].map(({ key, label, Icon }) => (
                         <button
@@ -280,16 +361,19 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
             }}>
                 <div
                     ref={containerRef}
-                    className={`relative w-full bg-zinc-950 overflow-hidden shadow-2xl ${
+                    className={`relative w-full overflow-hidden shadow-2xl ${
                         isFullscreen
                             ? "fixed inset-0 z-50 w-screen h-screen rounded-none"
                             : "h-[550px] rounded-2xl"
                     }`}
+                    style={{
+                        background: "radial-gradient(circle at center, #18181b 0%, #09090b 60%, #000000 100%)"
+                    }}
                 >
                     {/* Fullscreen toggle button */}
                     <button
                         onClick={toggleFullscreen}
-                        className="absolute top-4 left-4 z-20 bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg backdrop-blur font-mono text-[10px] uppercase tracking-wider transition shadow-lg flex items-center gap-1.5"
+                        className="absolute top-4 left-4 z-20 bg-zinc-900/40 hover:bg-zinc-800/80 border border-zinc-700/50 text-zinc-300 hover:text-white px-3 py-1.5 rounded-lg backdrop-blur-md font-mono text-[10px] uppercase tracking-wider transition shadow-lg flex items-center gap-1.5"
                     >
                         {isFullscreen ? <><CollapseIcon /> Exit Space</> : <><ExpandIcon /> Expand</>}
                     </button>
@@ -298,160 +382,224 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
 
                     {/* Empty state overlays for model-required modes */}
                     {activeMode !== "dataset" && !activeModelId && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/80 backdrop-blur-sm z-10 gap-4">
-                            <div className="w-12 h-12 rounded-full border border-zinc-700 bg-zinc-900 flex items-center justify-center text-zinc-500">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/50 backdrop-blur-md z-10 gap-4">
+                            <div className="w-12 h-12 rounded-full border border-zinc-700/50 bg-zinc-900/50 flex items-center justify-center text-zinc-400">
                                 {activeMode === "boundary" && <BoundaryIcon />}
                                 {activeMode === "tree" && <TreeIcon />}
                                 {activeMode === "importance" && <PillarsIcon />}
                             </div>
                             <div className="text-center">
-                                <p className="text-sm font-semibold text-zinc-300">
+                                <p className="text-sm font-semibold text-zinc-200">
                                     {activeMode === "boundary" ? "No model for Decision Boundary" :
                                         activeMode === "tree" ? "No model for Decision Tree" :
                                             "No model for Feature Pillars"}
                                 </p>
-                                <p className="text-xs text-zinc-500 mt-1.5 max-w-xs">
+                                <p className="text-xs text-zinc-400 mt-1.5 max-w-xs">
                                     Train or load a model in the <span className="text-emerald-400">Train Model</span> tab to enable this visualization.
                                 </p>
                             </div>
                         </div>
                     )}
 
-                    {/* Floating Tooltip HUD */}
-                    {hoveredItem && (
-                        <div className="absolute bottom-4 left-4 bg-zinc-950/90 backdrop-blur border border-zinc-800 p-4 rounded-xl text-xs space-y-1.5 shadow-2xl font-mono text-zinc-350 max-w-[280px] pointer-events-none animate-fade-in select-none">
+                    {/* Floating Tooltip HUD (on hover) */}
+                    {hoveredItem && !selectedPoint && (
+                        <div className="absolute bottom-4 left-4 bg-zinc-950/70 backdrop-blur-xl border border-zinc-700/50 p-4 rounded-xl text-xs space-y-1.5 shadow-2xl font-mono text-zinc-300 max-w-[280px] pointer-events-none animate-fade-in select-none z-10">
                             {hoveredItem.type === "point" && (
                                 <>
-                                    <span className="block text-[9px] text-zinc-500 font-bold uppercase">Dataset Probe</span>
-                                    <strong className="text-zinc-200">Data Row Index: {hoveredItem.index}</strong>
-                                    <span className="block text-[10px] text-zinc-400">Ray Distance: {hoveredItem.distance.toFixed(2)}</span>
+                                    <span className="block text-[9px] text-zinc-400 font-bold uppercase">Dataset Probe</span>
+                                    <strong className="text-white text-sm">Data Row Index: {hoveredItem.index}</strong>
+                                    <span className="block text-[10px] text-zinc-500">Ray Distance: {hoveredItem.distance.toFixed(2)}</span>
                                 </>
                             )}
                             {hoveredItem.type === "pillar" && (
                                 <>
                                     <span className="block text-[9px] text-emerald-450 font-bold uppercase">Feature Importance</span>
-                                    <strong className="text-zinc-200 block truncate" title={hoveredItem.name}>{hoveredItem.name}</strong>
+                                    <strong className="text-white block truncate" title={hoveredItem.name}>{hoveredItem.name}</strong>
                                     <span className="text-[10px] text-zinc-450">Impact Score: {hoveredItem.value.toFixed(4)}</span>
                                 </>
                             )}
                             {hoveredItem.type === "tree_node" && (
                                 <>
-                                    <span className="block text-[9px] text-zinc-550 font-bold uppercase">Tree Coordinate Node</span>
-                                    <strong className="text-zinc-200">{hoveredItem.is_leaf ? "Leaf node" : "Boundary node"}</strong>
+                                    <span className="block text-[9px] text-zinc-400 font-bold uppercase">Tree Coordinate Node</span>
+                                    <strong className="text-white">{hoveredItem.is_leaf ? "Leaf node" : "Boundary node"}</strong>
                                     {!hoveredItem.is_leaf ? (
-                                        <span className="block text-[10px] text-zinc-400">
+                                        <span className="block text-[10px] text-zinc-300">
                                             Split condition: {hoveredItem.feature} &lt;= {hoveredItem.threshold?.toFixed(2)}
                                         </span>
                                     ) : (
-                                        <span className="block text-[10px] text-zinc-400">
+                                        <span className="block text-[10px] text-zinc-300">
                                             Prediction: {JSON.stringify(hoveredItem.value)}
                                         </span>
                                     )}
-                                    <span className="block text-[9px] text-zinc-650">Node depth: {hoveredItem.depth}</span>
+                                    <span className="block text-[9px] text-zinc-500">Node depth: {hoveredItem.depth}</span>
                                 </>
                             )}
                         </div>
                     )}
 
+                    {/* Interactive Instance Card (on click) */}
+                    {selectedPoint && selectedPoint.type === "point" && (
+                        <div className="absolute top-4 left-4 bg-zinc-950/70 backdrop-blur-xl border border-zinc-700/50 p-5 rounded-xl text-xs shadow-2xl max-w-[300px] z-20 animate-fade-in custom-scrollbar overflow-y-auto max-h-[90%]">
+                            <div className="flex justify-between items-start mb-4 border-b border-zinc-800/50 pb-3">
+                                <div>
+                                    <span className="block text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Instance Explorer</span>
+                                    <strong className="text-white text-sm">Row #{selectedPoint.index}</strong>
+                                </div>
+                                <button onClick={() => setSelectedPoint(null)} className="text-zinc-500 hover:text-white transition">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                </button>
+                            </div>
+
+                            {/* Raw Features List */}
+                            <div className="space-y-2 mb-4">
+                                <span className="block text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Original Features</span>
+                                {Object.entries(selectedPoint.raw || {}).map(([key, val]) => (
+                                    <div key={key} className="flex justify-between font-mono text-[10px] border-b border-zinc-800/30 pb-1">
+                                        <span className="text-zinc-400 truncate pr-2 max-w-[150px]">{key}</span>
+                                        <span className="text-emerald-400">{val !== null ? String(val) : "NaN"}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <button 
+                                onClick={() => engineRef.current?.flyToPoint(selectedPoint.index)}
+                                className="w-full py-2 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 rounded-lg border border-emerald-500/30 transition flex items-center justify-center gap-2 font-semibold"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M3 12h6m6 0h6m-9-9v6m0 6v6"/></svg>
+                                Focus Camera
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Contextual HUD (Top Center) */}
+                    {datasetInfo && (
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-zinc-950/60 backdrop-blur-xl border border-zinc-700/50 px-5 py-2 rounded-full flex gap-6 text-[10px] font-mono text-zinc-300 shadow-2xl z-10">
+                            <div>
+                                <span className="text-zinc-500 mr-2">POINTS</span>
+                                <span className="text-white font-bold">{datasetInfo.total}</span>
+                            </div>
+                            {datasetInfo.target && (
+                                <div>
+                                    <span className="text-zinc-500 mr-2">TARGET</span>
+                                    <span className="text-emerald-400 font-bold">{datasetInfo.target}</span>
+                                </div>
+                            )}
+                            <div>
+                                <span className="text-zinc-500 mr-2">TYPE</span>
+                                <span className="text-blue-400 font-bold">{datasetInfo.task_type}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Camera Presets & Auto Tour (Bottom Center) */}
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-zinc-950/60 backdrop-blur-xl border border-zinc-700/50 p-1.5 rounded-full flex gap-1 shadow-2xl z-20 transition-all">
+                        <button onClick={() => engineRef.current?.tweenCameraTo("front")} className="px-3 py-1.5 rounded-full text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition">FRONT</button>
+                        <button onClick={() => engineRef.current?.tweenCameraTo("top")} className="px-3 py-1.5 rounded-full text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition">TOP</button>
+                        <button onClick={() => engineRef.current?.tweenCameraTo("side")} className="px-3 py-1.5 rounded-full text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition">SIDE</button>
+                        <div className="w-px h-4 bg-zinc-700/50 self-center mx-1" />
+                        <button onClick={() => engineRef.current?.tweenCameraTo("reset")} className="px-3 py-1.5 rounded-full text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition">RESET</button>
+                        <div className="w-px h-4 bg-zinc-700/50 self-center mx-1" />
+                        <button onClick={() => setShowLabels(!showLabels)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition ${showLabels ? "text-white bg-zinc-800/80" : "text-zinc-500 hover:text-white hover:bg-zinc-800/80"}`}>
+                            LABELS
+                        </button>
+                        <button onClick={handleAutoTour} className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-bold text-zinc-950 bg-emerald-500 hover:bg-emerald-400 transition shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M5 3l14 9-14 9V3z"/></svg>
+                            TOUR
+                        </button>
+                    </div>
+
                     {/* Floating Prediction Overlay Panel */}
-                    <div className="absolute top-4 right-4 w-[280px] max-h-[500px] overflow-y-auto bg-zinc-900/95 backdrop-blur border border-zinc-700/80 rounded-xl p-4 space-y-4 shadow-2xl custom-scrollbar text-xs">
-                        <div className="border-b border-zinc-800 pb-2 space-y-1.5">
-                            <div className="flex items-center gap-2">
-                                <div className={`h-1.5 w-1.5 rounded-full shrink-0 ${activeModelId ? "bg-emerald-400 shadow-emerald-400/50 shadow-sm animate-pulse" : "bg-zinc-600"}`} />
-                                <h5 className="font-bold text-zinc-200 uppercase tracking-wider text-[11px]">Cinematic Prediction</h5>
+                    <div className="absolute top-4 right-4 w-[260px] max-h-[80%] overflow-y-auto bg-zinc-950/70 backdrop-blur-xl border border-zinc-700/50 rounded-2xl p-4 shadow-2xl custom-scrollbar text-xs flex flex-col gap-4 z-20 transition-all hover:bg-zinc-950/80 hover:border-zinc-600/60">
+                        <div className="border-b border-zinc-800/60 pb-3">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className={`h-1.5 w-1.5 rounded-full shrink-0 ${activeModelId ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" : "bg-zinc-600"}`} />
+                                <h5 className="font-bold text-zinc-200 uppercase tracking-wider text-[10px]">Live Prediction</h5>
                             </div>
                             {activeModelId ? (
-                                <div className="rounded-md bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 font-mono text-[9px] text-zinc-400 space-y-0.5">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-zinc-600 uppercase tracking-wide">Model</span>
-                                        <span className="text-emerald-400 font-semibold">{activeModelAlgo?.replace(/_/g, " ") || "\u2014"}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-zinc-600 uppercase tracking-wide">Target</span>
-                                        <span className="text-zinc-300">{activeModelTarget || "\u2014"}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-zinc-600 uppercase tracking-wide">Job ID</span>
-                                        <span className="text-zinc-500">{activeModelId.slice(0, 8)}&hellip;</span>
-                                    </div>
+                                <div className="text-[10px] text-zinc-400 space-y-0.5 font-mono">
+                                    <div className="flex justify-between"><span>Model</span><span className="text-emerald-400">{activeModelAlgo?.replace(/_/g, " ") || "\u2014"}</span></div>
+                                    <div className="flex justify-between"><span>Target</span><span className="text-zinc-300">{activeModelTarget || "\u2014"}</span></div>
                                 </div>
                             ) : (
                                 <p className="text-[10px] text-zinc-500 italic">No active model. Train one in the Train Model tab.</p>
                             )}
                         </div>
 
-                        <form onSubmit={handleTriggerPrediction} className="space-y-3">
-                            <div className="space-y-2.5 max-h-[200px] overflow-y-auto pr-1">
-                                {numericCols.map(col => {
-                                    const colProfile = columns.find(c => c.name === col.name);
-                                    const isSelectable = colProfile && (
-                                        colProfile.detected_type === "Boolean" ||
-                                        colProfile.unique_count <= 8
-                                    );
+                        <form onSubmit={handleTriggerPrediction} className="flex flex-col gap-4">
+                            <div>
+                                <span className="block text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-3">Passenger/Instance Features</span>
+                                <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                                    {numericCols.map(col => {
+                                        const colProfile = columns.find(c => c.name === col.name);
+                                        const isSelectable = colProfile && (
+                                            colProfile.detected_type === "Boolean" ||
+                                            colProfile.unique_count <= 8
+                                        );
 
-                                    let options: { label: string; value: number }[] = [];
-                                    if (colProfile) {
-                                        if (colProfile.detected_type === "Boolean") {
-                                            options = [
-                                                { label: "0 (No)", value: 0 },
-                                                { label: "1 (Yes)", value: 1 }
-                                            ];
-                                        } else if (colProfile.stats && "top_values" in colProfile.stats) {
-                                            const top = (colProfile.stats as CategoricalStats).top_values || [];
-                                            options = top.map(t => {
-                                                const valNum = parseFloat(String(t.value));
-                                                return {
-                                                    label: String(t.value),
-                                                    value: isNaN(valNum) ? 0 : valNum
-                                                };
-                                            });
+                                        let options: { label: string; value: number }[] = [];
+                                        if (colProfile) {
+                                            if (colProfile.detected_type === "Boolean") {
+                                                options = [
+                                                    { label: "0 (No)", value: 0 },
+                                                    { label: "1 (Yes)", value: 1 }
+                                                ];
+                                            } else if (colProfile.stats && "top_values" in colProfile.stats) {
+                                                const top = (colProfile.stats as CategoricalStats).top_values || [];
+                                                options = top.map(t => {
+                                                    const valNum = parseFloat(String(t.value));
+                                                    return {
+                                                        label: String(t.value),
+                                                        value: isNaN(valNum) ? 0 : valNum
+                                                    };
+                                                });
+                                            }
                                         }
-                                    }
 
-                                    return (
-                                        <div key={col.name} className="flex flex-col gap-1 border-b border-zinc-800/40 pb-2">
-                                            <div className="flex justify-between items-center gap-2">
-                                                <label className="font-mono text-zinc-450 truncate max-w-[130px]" title={col.name}>{col.name}</label>
-                                                {isSelectable && options.length > 0 ? (
-                                                    <select
-                                                        value={predInputs[col.name] ?? 0}
-                                                        onChange={(e) => setPredInputs({ ...predInputs, [col.name]: parseFloat(e.target.value) || 0 })}
-                                                        className="w-[90px] bg-zinc-950 border border-zinc-850 rounded px-2 py-1 text-zinc-350 text-right outline-none focus:border-zinc-555 text-xs"
-                                                    >
-                                                        {options.map((opt, i) => (
-                                                            <option key={i} value={opt.value}>
-                                                                {opt.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                ) : (
-                                                    <input
-                                                        type="number"
-                                                        step="any"
-                                                        min={colProfile?.stats && "min" in colProfile.stats ? (colProfile.stats as NumericStats).min ?? undefined : undefined}
-                                                        max={colProfile?.stats && "max" in colProfile.stats ? (colProfile.stats as NumericStats).max ?? undefined : undefined}
-                                                        value={predInputs[col.name] ?? ""}
-                                                        onChange={(e) => setPredInputs({ ...predInputs, [col.name]: e.target.value === "" ? 0 : parseFloat(e.target.value) || 0 })}
-                                                        className="w-[90px] bg-zinc-950 border border-zinc-850 rounded px-2 py-1 text-zinc-300 text-right outline-none focus:border-zinc-550 text-xs"
-                                                    />
+                                        return (
+                                            <div key={col.name} className="flex flex-col gap-1 border-b border-zinc-800/40 pb-2">
+                                                <div className="flex justify-between items-center gap-2">
+                                                    <label className="font-mono text-zinc-450 truncate max-w-[130px]" title={col.name}>{col.name}</label>
+                                                    {isSelectable && options.length > 0 ? (
+                                                        <select
+                                                            value={predInputs[col.name] ?? 0}
+                                                            onChange={(e) => setPredInputs({ ...predInputs, [col.name]: parseFloat(e.target.value) || 0 })}
+                                                            className="w-[90px] bg-zinc-950 border border-zinc-850 rounded px-2 py-1 text-zinc-350 text-right outline-none focus:border-zinc-555 text-xs"
+                                                        >
+                                                            {options.map((opt, i) => (
+                                                                <option key={i} value={opt.value}>
+                                                                    {opt.label}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    ) : (
+                                                        <input
+                                                            type="number"
+                                                            step="any"
+                                                            min={colProfile?.stats && "min" in colProfile.stats ? (colProfile.stats as NumericStats).min ?? undefined : undefined}
+                                                            max={colProfile?.stats && "max" in colProfile.stats ? (colProfile.stats as NumericStats).max ?? undefined : undefined}
+                                                            value={predInputs[col.name] ?? ""}
+                                                            onChange={(e) => setPredInputs({ ...predInputs, [col.name]: e.target.value === "" ? 0 : parseFloat(e.target.value) || 0 })}
+                                                            className="w-[90px] bg-zinc-950 border border-zinc-850 rounded px-2 py-1 text-zinc-300 text-right outline-none focus:border-zinc-550 text-xs"
+                                                        />
+                                                    )}
+                                                </div>
+                                                {!isSelectable && colProfile?.stats && "min" in colProfile.stats && (
+                                                    <span className="block text-[8px] text-zinc-500 text-right font-mono">
+                                                        [{(colProfile.stats as NumericStats).min} - {(colProfile.stats as NumericStats).max}]
+                                                    </span>
                                                 )}
                                             </div>
-                                            {!isSelectable && colProfile?.stats && "min" in colProfile.stats && (
-                                                <span className="block text-[8px] text-zinc-500 text-right font-mono">
-                                                    [{(colProfile.stats as NumericStats).min} - {(colProfile.stats as NumericStats).max}]
-                                                </span>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
                             </div>
                             <button
                                 type="submit"
                                 disabled={predLoading || !activeModelId}
-                                className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed border border-emerald-500/50"
                             >
                                 <RocketIcon />
-                                {predLoading ? "Processing..." : "Launch Prediction Probe"}
+                                {predLoading ? "Processing..." : "Launch Prediction"}
                             </button>
                         </form>
 
@@ -461,14 +609,43 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
                             </div>
                         )}
 
-                        {predResult && (
-                            <div className="p-3 bg-emerald-950/20 border border-emerald-900/40 rounded-lg space-y-1 text-center animate-fade-in">
-                                <span className="block text-[9px] text-emerald-450 font-bold uppercase">Result Class</span>
-                                <strong className="text-lg text-white font-mono">{predResult.prediction}</strong>
-                                {predResult.confidence !== null && (
-                                    <span className="block text-[10px] text-zinc-500">
-                                        Confidence: {(predResult.confidence * 100).toFixed(1)}%
-                                    </span>
+                        {isProbeFlying && (
+                            <div className="p-3 border border-[#22d3ee]/40 bg-[#22d3ee]/10 rounded-lg text-center animate-pulse">
+                                <span className="block text-[10px] text-[#22d3ee] font-bold uppercase tracking-widest">Probe Launched</span>
+                                <span className="block text-xs text-zinc-300 mt-1">Analyzing coordinates...</span>
+                            </div>
+                        )}
+
+                        {!isProbeFlying && predResult && (
+                            <div className="p-3 bg-emerald-950/20 border border-emerald-900/40 rounded-lg space-y-3 animate-fade-in">
+                                <div className="text-center">
+                                    <span className="block text-[9px] text-emerald-450 font-bold uppercase tracking-widest mb-1">Result Class</span>
+                                    <strong className="text-xl text-white font-mono">{predResult.prediction}</strong>
+                                    {predResult.confidence !== null && (
+                                        <span className="block text-[10px] text-zinc-500 mt-0.5">
+                                            Confidence: {(predResult.confidence * 100).toFixed(1)}%
+                                        </span>
+                                    )}
+                                </div>
+                                
+                                {predictionNeighbors && predictionNeighbors.length > 0 && (
+                                    <div className="border-t border-emerald-900/40 pt-2 mt-2">
+                                        <span className="block text-[9px] text-zinc-500 font-bold uppercase mb-1">Nearest Neighbors</span>
+                                        <div className="flex gap-1 flex-wrap justify-center">
+                                            {predictionNeighbors.map((n, i) => (
+                                                <button 
+                                                    key={i} 
+                                                    onClick={() => {
+                                                        setSelectedPoint({ type: "point", index: n });
+                                                        engineRef.current?.flyToPoint(n);
+                                                    }}
+                                                    className="px-2 py-0.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-[9px] text-zinc-300 rounded font-mono transition"
+                                                >
+                                                    #{n}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         )}

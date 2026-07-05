@@ -16,8 +16,25 @@ export class DatasetRenderer {
     private yAxis: string = "";
     private zAxis: string = "";
 
+    // Hover feedback
+    private hoverSprite: THREE.Sprite;
+    private hoveredIndex: number | null = null;
+
     constructor(scene: THREE.Scene) {
         this.scene = scene;
+
+        const spriteMat = new THREE.SpriteMaterial({
+            map: this.createParticleTexture(),
+            color: new THREE.Color(COLORS.highlight),
+            transparent: true,
+            opacity: 0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        this.hoverSprite = new THREE.Sprite(spriteMat);
+        this.hoverSprite.scale.set(1.5, 1.5, 1.5);
+        this.hoverSprite.visible = false;
+        this.scene.add(this.hoverSprite);
     }
 
     public setData(points: PointData[], xAxis: string, yAxis: string, zAxis: string) {
@@ -83,26 +100,43 @@ export class DatasetRenderer {
         geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
         const texture = this.createParticleTexture();
+        texture.needsUpdate = true;
 
         const material = new THREE.PointsMaterial({
-            size: 0.35,
+            size: 0.25, // World units, creates 3D depth perception
+            sizeAttenuation: true, 
             vertexColors: true,
             transparent: true,
-            opacity: 0.85,
+            opacity: 1.0,
             map: texture,
-            depthWrite: false
+            alphaTest: 0.01, // Forces WebGL to respect alpha map bounds even if state is dirty
+            depthWrite: false, // Prevents alpha sorting bugs (points disappearing)
+            blending: THREE.AdditiveBlending // Premium glowing look
         });
 
         this.pointsMesh = new THREE.Points(geometry, material);
         this.scene.add(this.pointsMesh);
     }
 
+    private morphStartTime: number = 0;
+    private morphDuration: number = 750; // ms
+    private isMorphing: boolean = false;
+    private startPositions: Float32Array | null = null;
+
     public updateAxes(xAxis: string, yAxis: string, zAxis: string) {
         this.xAxis = xAxis;
         this.yAxis = yAxis;
         this.zAxis = zAxis;
 
-        if (!this.targetPositions || this.rawPoints.length === 0) return;
+        if (!this.targetPositions || !this.currentPositions || this.rawPoints.length === 0) return;
+
+        // Initialize startPositions if not created
+        if (!this.startPositions || this.startPositions.length !== this.currentPositions.length) {
+            this.startPositions = new Float32Array(this.currentPositions.length);
+        }
+
+        // Snapshot current positions before morphing 
+        this.startPositions.set(this.currentPositions);
 
         // Set target coordinate points for morphing 
         this.rawPoints.forEach((pt, i) => {
@@ -110,41 +144,82 @@ export class DatasetRenderer {
             this.targetPositions![i * 3 + 1] = pt.coords[yAxis] ?? -10;
             this.targetPositions![i * 3 + 2] = pt.coords[zAxis] ?? 0;
         });
+
+        this.isMorphing = true;
+        this.morphStartTime = performance.now();
     }
 
-    public update() {
-        if (!this.pointsMesh || !this.currentPositions || !this.targetPositions) return;
+    // Cubic ease out function
+    private easeOutCubic(x: number): number {
+        return 1 - Math.pow(1 - x, 3);
+    }
+
+    public update(time: number) {
+        if (!this.pointsMesh || !this.currentPositions || !this.targetPositions || !this.startPositions) return;
 
         const positions = this.pointsMesh.geometry.attributes.position.array as Float32Array;
-
         let needsUpdate = false;
 
-        for (let i = 0; i < positions.length; i++) {
-            const diff = this.targetPositions[i] - positions[i];
-            if (Math.abs(diff) > 0.001) {
-                // Smooth interpolation (lerp) towards target coordiante 
-                positions[i] = lerp(positions[i], this.targetPositions[i], 0.1);
-                needsUpdate = true;
+        if (this.isMorphing) {
+            const now = performance.now();
+            let progress = (now - this.morphStartTime) / this.morphDuration;
+            
+            if (progress >= 1.0) {
+                progress = 1.0;
+                this.isMorphing = false;
             }
+
+            const eased = this.easeOutCubic(progress);
+
+            for (let i = 0; i < positions.length; i++) {
+                const start = this.startPositions[i];
+                const target = this.targetPositions[i];
+                // Update base currentPositions
+                this.currentPositions[i] = start + (target - start) * eased;
+                // Sync positions directly
+                positions[i] = this.currentPositions[i];
+            }
+            needsUpdate = true;
         }
 
         if (needsUpdate) {
             this.pointsMesh.geometry.attributes.position.needsUpdate = true;
         }
+
+        // Hover Sprite Tracking & Animation
+        if (this.hoveredIndex !== null) {
+            this.hoverSprite.visible = true;
+            const idx = this.hoveredIndex * 3;
+            this.hoverSprite.position.set(positions[idx], positions[idx + 1], positions[idx + 2]);
+            
+            // Tiny scale animation for hover
+            const scaleOffset = Math.sin(time * 10) * 0.2;
+            this.hoverSprite.scale.set(1.5 + scaleOffset, 1.5 + scaleOffset, 1.5 + scaleOffset);
+            this.hoverSprite.material.opacity = 0.8 + Math.sin(time * 8) * 0.2;
+        } else {
+            this.hoverSprite.visible = false;
+        }
     }
+    
+    public setHoveredIndex(index: number | null) {
+        this.hoveredIndex = index;
+    }
+
     private createParticleTexture(): THREE.CanvasTexture {
         const canvas = document.createElement("canvas");
-        canvas.width = 16;
-        canvas.height = 16;
+        canvas.width = 32;
+        canvas.height = 32;
         const ctx = canvas.getContext("2d")!;
 
-        const grad = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
+        // Soft gaussian-like glow
+        const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
         grad.addColorStop(0, "rgba(255, 255, 255, 1)");
-        grad.addColorStop(0.8, "rgba(255, 255, 255, 1)");
+        grad.addColorStop(0.2, "rgba(255, 255, 255, 0.8)");
+        grad.addColorStop(0.5, "rgba(255, 255, 255, 0.2)");
         grad.addColorStop(1, "rgba(255, 255, 255, 0)");
 
         ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 16, 16);
+        ctx.fillRect(0, 0, 32, 32);
 
         return new THREE.CanvasTexture(canvas);
     }

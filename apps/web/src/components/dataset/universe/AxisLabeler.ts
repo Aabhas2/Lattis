@@ -9,8 +9,12 @@ export class AxisLabeler {
     }
 
     updateLabels(xName: string, yName: string, zName: string): void {
-        // Remove old sprites 
-        this.sprites.forEach(s => this.scene.remove(s));
+        // Remove old sprites and dispose their textures to prevent WebGL texture corruption
+        this.sprites.forEach(s => {
+            (s.material as THREE.SpriteMaterial).map?.dispose();
+            s.material.dispose();
+            this.scene.remove(s);
+        });
         this.sprites = [];
 
         const labels = [
@@ -71,6 +75,32 @@ export class AxisLabeler {
         });
 
         return new THREE.Sprite(material);
+    }
+
+    public setVisible(visible: boolean): void {
+        this.sprites.forEach(s => {
+            s.visible = visible;
+        });
+    }
+
+    public update(camera: THREE.Camera): void {
+        const maxDistance = 40;
+        const minDistance = 10;
+        
+        this.sprites.forEach(sprite => {
+            if (!sprite.visible) return;
+            
+            const distance = camera.position.distanceTo(sprite.position);
+            
+            let opacity = 1.0;
+            if (distance > minDistance) {
+                // Fade out as distance increases
+                opacity = 1.0 - Math.min(1.0, (distance - minDistance) / (maxDistance - minDistance));
+            }
+            
+            // Apply exponential curve for smoother fade
+            (sprite.material as THREE.SpriteMaterial).opacity = Math.pow(opacity, 1.5) * 0.9;
+        });
     }
 
     dispose(): void {

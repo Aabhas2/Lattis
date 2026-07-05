@@ -10,10 +10,12 @@ export interface PointData {
 export interface VisualizationData {
     points: PointData[];
     target_column: string | null;
-    coefficients: number[] | null;
+    coefficients: Record<string, number> | null;
     intercept: number | null;
     feature_importance: { feature: string; importance: number }[];
     tree: TreeNode | null;
+    scale_params: Record<string, { min: number; max: number; mean: number }>;
+    task_type: string;
 }
 
 export interface TreeNode {
