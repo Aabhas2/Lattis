@@ -2,11 +2,13 @@
 
 **Lattis** is an interactive machine learning studio for experimenting with data preprocessing, model training, evaluation, and immersive 3D visualization. It combines an end-to-end ML workflow with a custom built Three.js-powered ML Universe, enabling users to explore datasets, compare models, and understand machine learning visually.
 
-![Lattis Dashboard](./docs/preview.png) *(Note: Add a screenshot here)*
+![Lattis Landing Page](./docs/hero.png)
 
 ## 🚀 Features
 
 ### 1. Dataset Profiling & Cleaning
+![Dataset Profiling Dashboard](./docs/profiling.png)
+
 - **Upload & Parse:** Drag and drop `.csv` files.
 - **Statistical Analysis:** Automatic calculation of mean, median, standard deviation, and missing values.
 - **Categorical Insights:** Fast value-count binning and distributions.
