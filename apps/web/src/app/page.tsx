@@ -41,6 +41,14 @@ const SpaceIcon = () => (
     </svg>
 );
 
+const TAB_LABELS: Record<string, string> = {
+    overview: "Overview",
+    visualize: "Visualizations",
+    pipeline: "Pipeline Builder",
+    model_train: "Train Model",
+    ml_space: "ML Universe",
+};
+
 function ProfilePageContent() {
     type PageView = "upload" | "loading" | "profile";
     const [view, setView] = useState<PageView>("upload");
@@ -173,7 +181,7 @@ function ProfilePageContent() {
                                             <line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/>
                                         </svg>
                                     ),
-                                    title: "3D ML Space",
+                                    title: "ML Universe",
                                     desc: "Explore your dataset and model predictions in a fully interactive Three.js 3D universe."
                                 }
                             ].map((feat, i) => (
@@ -212,27 +220,36 @@ function ProfilePageContent() {
 
                 {view === "profile" && profile && (
                     <div className="space-y-8">
-                        {/* Top Profile Header Info Badge */}
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-zinc-800/80">
-                            <div>
-                                <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-3">
-                                    <span>{profile.filename}</span>
-                                    {profile.filename.toLowerCase().includes("cleaned") ? (
-                                        <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
-                                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                            Transformed Cleaned Version
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-zinc-550/10 text-zinc-400 border border-zinc-750/30">
-                                            Original File
-                                        </span>
-                                    )}
-                                </h1>
-                                <p className="text-xs text-zinc-400 mt-1">
-                                    ID: <span className="font-mono text-zinc-500">{profile.dataset_id}</span> • Size: <span className="font-semibold text-zinc-300">{profile.row_count.toLocaleString()} rows × {profile.column_count} columns</span>
-                                </p>
+                        {/* App Header & Dataset Info */}
+                        <div className="pb-6 border-b border-zinc-800/80">
+                            <div className="flex items-center gap-3 mb-6 select-none">
+                                <div className="relative w-[110px] h-[28px] flex items-center justify-center overflow-hidden cursor-pointer -ml-4" onClick={() => { window.history.pushState({}, "", "/"); setView("upload"); setProfile(null); }}>
+                                    <img src="/logo.png" alt="Lattis" className="absolute w-[160%] max-w-none h-auto object-cover hover:opacity-80 transition-opacity" />
+                                </div>
+                                <span className="text-zinc-700">/</span>
+                                <span className="text-sm text-zinc-400 font-medium tracking-wide mt-1">{TAB_LABELS[activeTab] || "Dataset Explorer"}</span>
                             </div>
-                            <div className="flex gap-2">
+                            
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                <div>
+                                    <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-3">
+                                        <span>{profile.filename}</span>
+                                        {profile.filename.toLowerCase().includes("cleaned") ? (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                                Transformed Cleaned Version
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-zinc-550/10 text-zinc-400 border border-zinc-750/30">
+                                                Original File
+                                            </span>
+                                        )}
+                                    </h1>
+                                    <p className="text-xs text-zinc-400 mt-2">
+                                        ID: <span className="font-mono text-zinc-500">{profile.dataset_id}</span> • Size: <span className="font-semibold text-zinc-300">{profile.row_count.toLocaleString()} rows × {profile.column_count} columns</span>
+                                    </p>
+                                </div>
+                                <div className="flex gap-3 mt-4 md:mt-0">
                                 <button
                                     onClick={async () => {
                                         try {
@@ -257,6 +274,7 @@ function ProfilePageContent() {
                                 </button>
                             </div>
                         </div>
+                    </div>
 
                         {/* Tab Navigation with icons */}
                         <div className="flex border-b border-zinc-800 overflow-x-auto">
@@ -265,7 +283,7 @@ function ProfilePageContent() {
                                 { key: "visualize", label: "Visualizations", Icon: VizIcon },
                                 { key: "pipeline", label: "Pipeline Builder", Icon: PipelineIcon },
                                 { key: "model_train", label: "Train Model", Icon: TrainIcon },
-                                { key: "ml_space", label: "ML Space (3D)", Icon: SpaceIcon },
+                                { key: "ml_space", label: "ML Universe", Icon: SpaceIcon },
                             ].map(({ key, label, Icon }) => (
                                 <button
                                     key={key}
