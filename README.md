@@ -82,32 +82,28 @@ Lattis is built as a distributed, containerized application designed for scale a
 - **Machine Learning:** Scikit-learn, XGBoost, LightGBM, Pandas, Numpy.
 - **Infrastructure:** Docker, Docker Compose, PostgreSQL, Redis, RQ (Redis Queue).
 
-## ⚡ Local Development
+## ⚡ Local Development (One-Command Start)
 
-Lattis comes with a `docker-compose.yml` file that orchestrates the entire stack (PostgreSQL, Redis, FastAPI backend, and Background Workers) locally with one command.
+Lattis comes with a fully configured `docker-compose.yml` file that orchestrates the **entire** stack locally (Next.js Frontend, FastAPI Backend, PostgreSQL, Redis, and RQ Workers) with a single command. This works seamlessly across Windows, Mac, and Linux.
 
 ### 1. Prerequisites
-- Docker and Docker Compose
-- Node.js 18+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
 
-### 2. Start the Backend Stack (API, DB, Redis)
+### 2. Start the Entire Application
 ```bash
 docker-compose up --build
 ```
-This will start:
-- FastAPI server on `http://localhost:8000`
-- PostgreSQL on port `5432`
-- Redis on port `6379`
-- RQ Worker listening to the default queue
 
-### 3. Start the Frontend
-In a new terminal window:
-```bash
-cd apps/web
-npm install
-npm run dev
-```
-The web application will be available at `http://localhost:3000`.
+### 3. Access Lattis
+Once Docker finishes building and the containers are running:
+- **Frontend Dashboard:** Go to [http://localhost:3000](http://localhost:3000)
+- **FastAPI Backend / Swagger UI:** Go to [http://localhost:8000/docs](http://localhost:8000/docs)
+
+*Note: The first time you run this command, Docker will download the necessary base images and install the machine learning dependencies, which may take a few minutes. Subsequent startups will be instant.*
+
+## 📖 API Contracts
+
+Detailed API documentation is located in [`docs/contracts.md`](docs/contracts.md). This covers all endpoints, expected request bodies, and database schemas.
 
 ## 🚢 Recommended Production Deployment
 

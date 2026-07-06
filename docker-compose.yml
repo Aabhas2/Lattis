@@ -50,5 +50,19 @@ services:
       - ./apps/api:/app
     command: ["python", "-m", "app.workers.rq_worker"]
 
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+
 volumes:
   pgdata:
