@@ -186,7 +186,7 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
                 setIsProbeFlying(false);
             });
 
-            const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+            const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
             const url = new URL(`${BASE_URL}/models/datasets/${datasetId}/visualize`);
             if (activeModelId) {
                 url.searchParams.append("model_id", activeModelId);

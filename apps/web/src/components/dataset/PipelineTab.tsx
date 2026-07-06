@@ -45,13 +45,13 @@ export default function PipelineTab({
             setLoading(true);
             try {
                 // Fetch list of pipelines for this dataset
-                const response = await fetch(`http://localhost:8000/pipelines?dataset_id=${datasetId}`);
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/pipelines?dataset_id=${datasetId}`);
                 const list = await response.json();
                 if (list.length > 0) {
                     setPipeline(list[0]);
                 } else {
                     // Create one if none exists
-                    const createRes = await fetch("http://localhost:8000/pipelines/", {
+                    const createRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/pipelines/`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ dataset_id: datasetId, name: "Cleaning pipeline" }),
@@ -140,7 +140,7 @@ export default function PipelineTab({
 
         try {
             // Replace operations array on the backend
-            const response = await fetch(`http://localhost:8000/pipelines/${pipeline.pipeline_id}/operations`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/pipelines/${pipeline.pipeline_id}/operations`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(ops),
@@ -160,7 +160,7 @@ export default function PipelineTab({
         setRunResult(null);
         setError(null);
         try {
-            const response = await fetch(`http://localhost:8000/pipelines/${pipeline.pipeline_id}/run`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/pipelines/${pipeline.pipeline_id}/run`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
             });
