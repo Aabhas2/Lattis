@@ -1,4 +1,7 @@
 #!/bin/bash
+# Run database migrations
+alembic upgrade head
+
 # Start the RQ worker in the background
 rq worker &
 # Start the FastAPI server in the foreground
