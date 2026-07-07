@@ -1,8 +1,28 @@
 # Lattis — Interactive Machine Learning Studio
 
-**Lattis** is an interactive machine learning studio for experimenting with data preprocessing, model training, evaluation, and immersive 3D visualization. It combines an end-to-end ML workflow with a custom built Three.js-powered ML Universe, enabling users to explore datasets, compare models, and understand machine learning visually.
+## 🌐 Live Demo
+**[https://lattis.vercel.app](https://lattis.vercel.app)** *(Replace with your actual deployed app link)*
 
-![Lattis Landing Page](./docs/hero.png)
+🎥 **Demo Video:** [https://youtu.be/...](https://youtu.be/...) *(Replace with your actual YouTube video link)*
+
+⭐ **Star the repository if you found it useful!**
+
+---
+
+> Existing AutoML tools are powerful but often hide what happens internally. Lattis was built to make machine learning interactive and visual, allowing users to understand preprocessing, model training, and predictions through an immersive 3D environment.
+
+![Lattis Demo](./docs/demo.gif)
+
+*(Note: To add your demo GIF, simply record a 5-8 second screen recording of the app, convert it to a `.gif`, name it `demo.gif`, and place it inside the `docs/` folder!)*
+
+## 🤔 Why Lattis?
+- ✓ **Interactive ML:** Build pipelines and train models visually without writing code.
+- ✓ **Beginner friendly:** Understand ML algorithms by literally *seeing* their decision boundaries.
+- ✓ **Runs locally with Docker:** One command spins up the entire distributed stack.
+- ✓ **Modern 3D visualization:** WebGL-powered 3D space with cinematic particle effects.
+- ✓ **Open Source:** Fully transparent and customizable.
+
+---
 
 ## 🚀 Features
 
@@ -38,41 +58,36 @@ Explore your dataset and model predictions in a fully immersive 3D space.
 
 Lattis is built as a distributed, containerized application designed for scale and performance.
 
-```text
-                  ┌────────────────────────┐
-                  │                        │
-                  │   Lattis Web Client    │
-                  │   (Next.js + React)    │
-                  │                        │
-                  └───────────┬────────────┘
-                              │
-                    REST API (JSON / HTTP)
-                              │
-                  ┌───────────▼────────────┐
-                  │                        │
-                  │   FastAPI ML Engine    │
-                  │       (Python)         │
-                  │                        │
-                  └─────┬────────────┬─────┘
-                        │            │
-            Jobs        │            │   Read/Write
-          (RQ Enqueue)  │            │  (SQLAlchemy)
-                        │            │
-            ┌───────────▼──┐      ┌──▼───────────┐
-            │              │      │              │
-            │    Redis     │      │  PostgreSQL  │
-            │ (Task Queue) │      │  (Metadata)  │
-            │              │      │              │
-            └──────┬───────┘      └──────────────┘
-                   │
-           Dequeue │
-                   │
-            ┌──────▼───────┐
-            │              │
-            │  RQ Workers  │
-            │(Model Train) │
-            │              │
-            └──────────────┘
+```mermaid
+flowchart TD
+    %% Styling
+    classDef browser fill:#18181b,stroke:#a1a1aa,stroke-width:2px,color:#fff
+    classDef frontend fill:#09090b,stroke:#06b6d4,stroke-width:2px,color:#fff
+    classDef backend fill:#09090b,stroke:#10b981,stroke-width:2px,color:#fff
+    classDef db fill:#09090b,stroke:#3b82f6,stroke-width:2px,color:#fff
+    classDef worker fill:#09090b,stroke:#f59e0b,stroke-width:2px,color:#fff
+
+    Browser("🌐 Web Browser / User"):::browser
+    
+    Next["⚛️ Next.js (React + Tailwind)"]:::frontend
+    
+    FastAPI["⚡ FastAPI (Python Backend)"]:::backend
+    
+    Postgres[("🐘 PostgreSQL (Metadata)")]:::db
+    
+    Redis[("🟥 Redis (Task Queue)")]:::db
+    
+    RQ["⚙️ RQ Workers (Job Processing)"]:::worker
+    
+    Scikit["🧠 Scikit-Learn / XGBoost"]:::worker
+
+    Browser -->|JSON / HTTP| Next
+    Next -->|REST API| FastAPI
+    FastAPI <-->|Read / Write| Postgres
+    FastAPI -->|Enqueue Jobs| Redis
+    Redis -->|Dequeue| RQ
+    RQ -->|Train / Eval| Scikit
+    RQ <-->|Save Results| Postgres
 ```
 
 ## 🛠️ Technology Stack
@@ -105,10 +120,27 @@ Once Docker finishes building and the containers are running:
 
 Detailed API documentation is located in [`docs/contracts.md`](docs/contracts.md). This covers all endpoints, expected request bodies, and database schemas.
 
+## 🗺️ Roadmap
+
+- [ ] Authentication
+- [ ] Saved Workspaces
+- [ ] SHAP Explainability
+- [ ] Time-series forecasting
+- [ ] Neural Network support
+- [ ] LLM-powered dataset insights
+- [ ] Collaborative projects
+
 ## 🚢 Recommended Production Deployment
 
 - **Frontend:** Vercel (zero-config, edge caching)
 - **Backend (FastAPI, Redis, Postgres, RQ Worker):** Railway or Render (native Dockerfile support, easy internal networking)
+
+## 🤝 Author
+
+**Aabhas Sharma**  
+University of Delhi  
+[LinkedIn](https://www.linkedin.com/in/) *(Update with your actual link)*  
+[Portfolio](#) *(Update with your actual link)*
 
 ## 📄 License
 MIT License

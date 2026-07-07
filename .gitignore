@@ -61,3 +61,5 @@ Thumbs.db
 asdf 
 
 DEVELOPER_GUIDE.md
+# Sample datasets
+docs/*.csv
