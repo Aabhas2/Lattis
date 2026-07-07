@@ -139,9 +139,7 @@ Detailed API documentation is located in [`docs/contracts.md`](docs/contracts.md
 ## 🤝 Author
 
 **Aabhas Sharma**  
-University of Delhi  
-[LinkedIn](https://www.linkedin.com/in/) *(Update with your actual link)*  
-[Portfolio](#) *(Update with your actual link)*
+[LinkedIn](www.linkedin.com/in/aabhas-sharma2) 
 
 ## 📄 License
 MIT License
