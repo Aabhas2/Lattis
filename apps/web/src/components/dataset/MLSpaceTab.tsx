@@ -698,8 +698,6 @@ export default function MLSpaceTab({ datasetId, columns }: MLSpaceTabProps) {
                                                         <input
                                                             type="number"
                                                             step="any"
-                                                            min={colProfile?.stats && "min" in colProfile.stats ? (colProfile.stats as NumericStats).min ?? undefined : undefined}
-                                                            max={colProfile?.stats && "max" in colProfile.stats ? (colProfile.stats as NumericStats).max ?? undefined : undefined}
                                                             value={predInputs[col.name] ?? ""}
                                                             onChange={(e) => setPredInputs({ ...predInputs, [col.name]: e.target.value === "" ? 0 : parseFloat(e.target.value) || 0 })}
                                                             className="w-[90px] bg-zinc-950 border border-zinc-850 rounded px-2 py-1 text-zinc-300 text-right outline-none focus:border-zinc-550 text-xs"

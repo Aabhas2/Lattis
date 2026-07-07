@@ -17,7 +17,7 @@ export class HoverManager {
         this.scene = scene;
 
         this.raycaster = new THREE.Raycaster();
-        this.raycaster.params.Points!.threshold = 0.15; // Match particle visual size closely
+        this.raycaster.params.Points!.threshold = 0.75; // Increased to make hovering much easier
         this.mouse = new THREE.Vector2();
 
         window.addEventListener("mousemove", this.handleMouseMove);

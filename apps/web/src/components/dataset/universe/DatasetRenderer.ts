@@ -57,7 +57,7 @@ export class DatasetRenderer {
         this.scene.add(this.selectedSprite);
     }
 
-    public setData(points: PointData[], xAxis: string, yAxis: string, zAxis: string) {
+    public setData(points: PointData[], xAxis: string, yAxis: string, zAxis: string, taskType?: string | null) {
         this.rawPoints = points;
         this.xAxis = xAxis;
         this.yAxis = yAxis;
@@ -83,8 +83,6 @@ export class DatasetRenderer {
 
         const targetMin = targetValues.length ? Math.min(...targetValues) : 0;
         const targetMax = targetValues.length ? Math.max(...targetValues) : 1;
-        const isLikelyBinary = targetMax <= 1 && targetMin >= 0 && 
-            new Set(targetValues).size <= 10;
 
         points.forEach((pt, i) => {
             // Start all particles collapsed at coordinate origin grid-level 
@@ -100,7 +98,7 @@ export class DatasetRenderer {
             // Color-code target class output 
             let colorHex = COLORS.axes;
             if (pt.target !== null) {
-                if (isLikelyBinary) {
+                if (taskType?.toLowerCase() === "classification") {
                     // Discrete classes: cycle through a set of distinct colors
                     const classColors = [COLORS.negative, COLORS.positive, COLORS.highlight, COLORS.prediction];
                     const classIndex = Math.round(pt.target) % classColors.length;
@@ -136,7 +134,6 @@ export class DatasetRenderer {
             transparent: true,
             opacity: 1.0,
             map: texture,
-            alphaTest: 0.01,
             depthWrite: false,
             blending: THREE.AdditiveBlending
         });
@@ -218,6 +215,7 @@ export class DatasetRenderer {
 
         if (needsUpdate) {
             this.pointsMesh.geometry.attributes.position.needsUpdate = true;
+            this.pointsMesh.geometry.computeBoundingSphere();
         }
 
         if (this.hoveredIndex !== null) {

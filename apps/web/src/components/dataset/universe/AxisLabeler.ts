@@ -26,7 +26,7 @@ export class AxisLabeler {
         for (const { text, position, color } of labels) {
             const sprite = this.makeTextSprite(text, color);
             sprite.position.copy(position);
-            sprite.scale.set(4, 1.5, 1);
+            sprite.scale.set(5.5, 1.17, 1);
             this.scene.add(sprite);
             this.sprites.push(sprite);
         }
@@ -34,7 +34,7 @@ export class AxisLabeler {
 
     private makeTextSprite(text: string, color: string): THREE.Sprite {
         const canvas = document.createElement("canvas");
-        canvas.width = 384; // Increased from 256 to fit arrow
+        canvas.width = 300; 
         canvas.height = 64;
 
         const ctx = canvas.getContext("2d");
@@ -42,45 +42,48 @@ export class AxisLabeler {
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Background pill 
-        ctx.fillStyle = "rgba(15, 15, 15, 0.75)";
+        let axisPrefix = "X";
+        if (color === "#4ade80") axisPrefix = "Y";
+        if (color === "#60a5fa") axisPrefix = "Z";
+
+        // Draw pill background
+        ctx.fillStyle = "rgba(10, 10, 10, 0.4)";
         ctx.beginPath();
-        ctx.roundRect(4, 4, canvas.width - 8, canvas.height - 8, 12);
+        ctx.roundRect(0, 12, canvas.width, 40, 20);
         ctx.fill();
 
-        // Border 
-        ctx.strokeStyle = color + "88";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(4, 4, canvas.width - 8, canvas.height - 8, 12);
-        ctx.stroke();
-
-        // Text 
+        // Draw axis prefix box
         ctx.fillStyle = color;
-        ctx.font = "bold 20px 'Inter', 'system-ui', sans-serif";
+        ctx.beginPath();
+        ctx.roundRect(0, 12, 40, 40, 20);
+        ctx.fill();
+
+        // Axis letter
+        ctx.fillStyle = "#09090b"; // dark background color for contrast
+        ctx.font = "900 18px 'Inter', system-ui, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
+        ctx.fillText(axisPrefix, 20, 32);
 
-        // Truncate long names 
-        const labelName = text.length > 12 ? text.slice(0, 10) + "…" : text;
+        // Label text
+        ctx.fillStyle = "#e4e4e7"; // light text
+        ctx.font = "600 15px 'Inter', system-ui, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
         
-        // Extract axis prefix (X, Y, Z or PC1, etc)
-        // Since we don't know which axis this is from just the text, we'll infer it from the color
-        let axisName = "";
-        if (color === "#f87171") axisName = "X ────────► ";
-        if (color === "#4ade80") axisName = "Y ────────► ";
-        if (color === "#60a5fa") axisName = "Z ────────► ";
-        
-        const fullLabel = axisName + labelName;
-        ctx?.fillText(fullLabel, canvas.width / 2, canvas.height / 2);
+        const labelName = text.length > 22 ? text.slice(0, 20) + "…" : text;
+        ctx.fillText(labelName, 52, 33);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.needsUpdate = true;
+        texture.minFilter = THREE.LinearFilter; // Ensure sharp text
 
         const material = new THREE.SpriteMaterial({
-            map: texture,
             transparent: true,
-            depthTest: false,
+            opacity: 1.0,
+            map: texture,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
         });
 
         return new THREE.Sprite(material);

@@ -218,7 +218,7 @@ def get_dataset_visualization_data(dataset_id: uuid.UUID, model_id: Optional[uui
     # Create a mapping for string targets to numbers
     target_mapping = {}
     if target_col and target_col in df.columns:
-        if df[target_col].dtype == object or df[target_col].dtype.name == 'category':
+        if not pd.api.types.is_numeric_dtype(df[target_col]):
             unique_vals = df[target_col].dropna().unique()
             target_mapping = {val: float(idx) for idx, val in enumerate(unique_vals)}
 
