@@ -34,8 +34,9 @@ https://github.com/user-attachments/assets/5c495c9e-cfe2-4fb2-82ad-8bb7062c8692
 - **Categorical Insights:** Fast value-count binning and distributions.
 
 ### 2. Pipeline Builder (No-Code Preprocessing)
-- Build robust scikit-learn preprocessing pipelines visually.
+- Build robust scikit-learn preprocessing pipelines visually without writing code.
 - Support for One-Hot Encoding, Label Encoding, Standard Scaling, MinMax Scaling, and custom Missing Value Imputations (Mean, Median, Mode, Constant).
+- **Export Anywhere:** Download the transformed dataset instantly as a clean `.csv`. Use Lattis as a lightning-fast preprocessing tool to prepare data for Jupyter Notebooks, Kaggle competitions, or external ML workflows—even if you don't train your models here.
 
 ### 3. Model Training Engine
 - Train models asynchronously.
