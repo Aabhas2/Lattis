@@ -11,9 +11,7 @@
 
 > Existing AutoML tools are powerful but often hide what happens internally. Lattis was built to make machine learning interactive and visual, allowing users to understand preprocessing, model training, and predictions through an immersive 3D environment.
 
-![Lattis Demo](./docs/demo.gif)
-
-*(Note: To add your demo GIF, simply record a 5-8 second screen recording of the app, convert it to a `.gif`, name it `demo.gif`, and place it inside the `docs/` folder!)*
+https://github.com/user-attachments/assets/5c495c9e-cfe2-4fb2-82ad-8bb7062c8692
 
 ## 🤔 Why Lattis?
 - ✓ **Interactive ML:** Build pipelines and train models visually without writing code.
@@ -27,7 +25,6 @@
 ## 🚀 Features
 
 ### 1. Dataset Profiling & Cleaning
-![Dataset Profiling Dashboard](./docs/profiling.png)
 
 - **Upload & Parse:** Drag and drop `.csv` files.
 - **Statistical Analysis:** Automatic calculation of mean, median, standard deviation, and missing values.
