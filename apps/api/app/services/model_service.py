@@ -79,6 +79,12 @@ class ModelService:
         # Model Selection 
         model = None
         le = None 
+        
+        if req.task_type == "classification" and y_train is not None:
+            from sklearn.preprocessing import LabelEncoder
+            le = LabelEncoder()
+            y_train = pd.Series(le.fit_transform(y_train), index=y_train.index)
+            y_test = pd.Series(le.transform(y_test), index=y_test.index)
 
         if req.algorithm == "kmeans": 
             model = KMeans(
@@ -177,10 +183,7 @@ class ModelService:
             elif req.algorithm == "xgboost": 
                 if not XGB_AVAILABLE:
                     raise ValueError("XGBoost is not installed on the server. Please run 'pip install xgboost' to use this model.")
-                from sklearn.preprocessing import LabelEncoder
-                le = LabelEncoder()
-                y_train = le.fit_transform(y_train) 
-                y_test = le.transform(y_test) 
+
 
                 model = XGBClassifier(
                     n_estimators=int(params.get("n_estimators", 100)), 

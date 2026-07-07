@@ -125,7 +125,7 @@ export class UniverseEngine {
 
     public loadData(data: VisualizationData) {
         this.currentData = data;
-        this.datasetRenderer.setData(data.points, this.xAxis, this.yAxis, this.zAxis);
+        this.datasetRenderer.setData(data.points, this.xAxis, this.yAxis, this.zAxis, data.task_type);
         this.modelSurfaceRenderer.updateData(data, this.xAxis, this.yAxis, this.zAxis);
         this.treeRenderer.updateData(data);
         if (this.clusterRenderer) {
