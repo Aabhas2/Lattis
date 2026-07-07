@@ -1,9 +1,12 @@
 # Lattis — Interactive Machine Learning Studio
 
-## 🌐 Live Demo
-**[https://lattis-five.vercel.app/](https://lattis-five.vercel.app/)** 
+[![Live Demo](https://img.shields.io/badge/Live-Demo-emerald?style=for-the-badge&logo=vercel)](https://lattis-five.vercel.app/)
+[![GitHub Stars](https://img.shields.io/github/stars/Aabhas2/Lattis?style=for-the-badge&color=amber&logo=github)](https://github.com/Aabhas2/Lattis)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](https://github.com/Aabhas2/Lattis/blob/main/LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Supported-2496ED?style=for-the-badge&logo=docker)](https://github.com/Aabhas2/Lattis)
 
-<!-- 🎥 **Demo Video:** [https://youtu.be/...](https://youtu.be/...) *(Replace with your actual YouTube video link)* -->
+<!-- DEMO VIDEO PLACEHOLDER -->
+
 
 ⭐ **Star the repository if you found it useful!**
 
