@@ -1,9 +1,9 @@
 # Lattis — Interactive Machine Learning Studio
 
 ## 🌐 Live Demo
-**[https://lattis.vercel.app](https://lattis.vercel.app)** *(Replace with your actual deployed app link)*
+**[https://lattis-five.vercel.app/](https://lattis-five.vercel.app/)** 
 
-🎥 **Demo Video:** [https://youtu.be/...](https://youtu.be/...) *(Replace with your actual YouTube video link)*
+<!-- 🎥 **Demo Video:** [https://youtu.be/...](https://youtu.be/...) *(Replace with your actual YouTube video link)* -->
 
 ⭐ **Star the repository if you found it useful!**
 
