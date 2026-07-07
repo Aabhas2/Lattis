@@ -293,7 +293,8 @@ def get_dataset_visualization_data(dataset_id: uuid.UUID, model_id: Optional[uui
                 if hasattr(estimator, "intercept_"):
                     intercept_val = estimator.intercept_ 
                     if hasattr(intercept_val, "tolist"): 
-                        intercept = intercept_val.tolist()
+                        intercept_list = intercept_val.tolist()
+                        intercept = intercept_list[0] if isinstance(intercept_list, list) and len(intercept_list) > 0 else float(intercept_list)
                     else: 
                         intercept = float(intercept_val) 
 
